@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "unsupported-python-fixture"
+version = "0.1.0"
+description = "Synthetic Python project — used as a fixture for qualy detect-stack to verify the unsupported-stack refusal path (SPEC §7.4)."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+demo = "unsupported_python.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/unsupported_python"]
