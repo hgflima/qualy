@@ -16,6 +16,7 @@
  *   - Stderr: NDJSON via logger plus the human-readable `--help` text.
  */
 import { runDetectStack } from "./commands/detect-stack.ts";
+import { runGitCleanCheck } from "./commands/git-clean-check.ts";
 import { EXIT_CODES, type ExitCode } from "./lib/exit-codes.ts";
 import { logger, output } from "./lib/logger.ts";
 
@@ -80,6 +81,7 @@ const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> =
  */
 const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>([
   ["detect-stack", runDetectStack],
+  ["git-clean-check", runGitCleanCheck],
 ]);
 
 const SUBCOMMANDS: ReadonlyMap<string, Subcommand> = new Map(

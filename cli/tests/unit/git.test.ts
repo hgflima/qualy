@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   churn90d,
+  dirtyFiles,
   firstCommitDate,
   type GitRunResult,
   type GitRunner,
@@ -188,6 +189,51 @@ describe("git wrappers", () => {
       setGitRunner(makeRunner(() => fail("fatal: not a git repository")).runner);
       const res = lsFilesByExt("/repo", ["ts"]);
       expect(res.ok).toBe(false);
+    });
+  });
+
+  describe("dirtyFiles", () => {
+    it("returns empty list for a clean tree", () => {
+      const { runner, calls } = makeRunner(() => ok(""));
+      setGitRunner(runner);
+      expect(dirtyFiles("/repo")).toEqual({ ok: true, value: [] });
+      expect(calls[0]?.args).toEqual(["status", "--porcelain=v1", "-z"]);
+    });
+
+    it("parses NUL-terminated entries from porcelain -z", () => {
+      const stdout = " M src/lib/git.ts\0?? new.ts\0";
+      setGitRunner(makeRunner(() => ok(stdout)).runner);
+      const res = dirtyFiles("/repo");
+      expect(res).toEqual({ ok: true, value: ["src/lib/git.ts", "new.ts"] });
+    });
+
+    it("preserves paths containing spaces verbatim", () => {
+      const stdout = " M path with spaces.ts\0";
+      setGitRunner(makeRunner(() => ok(stdout)).runner);
+      const res = dirtyFiles("/repo");
+      expect(res).toEqual({ ok: true, value: ["path with spaces.ts"] });
+    });
+
+    it("handles renames (skips the original-path token)", () => {
+      // R<space>new\0old\0 + an unrelated entry afterwards
+      const stdout = "R  new.ts\0old.ts\0 M other.ts\0";
+      setGitRunner(makeRunner(() => ok(stdout)).runner);
+      const res = dirtyFiles("/repo");
+      expect(res).toEqual({ ok: true, value: ["new.ts", "other.ts"] });
+    });
+
+    it("handles copies (skips the original-path token)", () => {
+      const stdout = "C  copy.ts\0src.ts\0";
+      setGitRunner(makeRunner(() => ok(stdout)).runner);
+      const res = dirtyFiles("/repo");
+      expect(res).toEqual({ ok: true, value: ["copy.ts"] });
+    });
+
+    it("propagates git failure", () => {
+      setGitRunner(makeRunner(() => fail("fatal: not a git repository")).runner);
+      const res = dirtyFiles("/repo");
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.error).toMatch(/not a git repository/);
     });
   });
 

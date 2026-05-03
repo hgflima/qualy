@@ -72,6 +72,42 @@ export function isClean(cwd: string): GitResult<boolean> {
 }
 
 /**
+ * List of files reported by `git status --porcelain=v1 -z` — covers tracked
+ * modifications and untracked files. Used by `git-clean-check` (SPEC §6) so
+ * the user knows *which* files block a destructive command.
+ *
+ * Why `-z`:
+ *   - Without it, paths with spaces, quotes, or newlines arrive escaped
+ *     (e.g. "foo\\nbar") and would need un-escaping.
+ *   - With `-z`, fields are NUL-terminated and paths are emitted verbatim.
+ *
+ * Parsing (porcelain v1):
+ *   - Each record: 2 status chars + space + path, terminated by NUL.
+ *   - Renames/copies (X='R'|'C'): the *next* NUL-terminated token holds the
+ *     original path; we surface only the new path here.
+ *
+ * Returns the list of changed paths (clean tree → empty list).
+ */
+export function dirtyFiles(cwd: string): GitResult<readonly string[]> {
+  const res = runner(cwd, ["status", "--porcelain=v1", "-z"]);
+  if (!res.ok) return fail(res.stderr.trim() || "git status failed");
+  if (res.stdout.length === 0) return { ok: true, value: [] };
+
+  const tokens = res.stdout.split("\0");
+  const paths: string[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const tok = tokens[i];
+    if (!tok) continue;
+    if (tok.length < 4) continue;
+    const x = tok[0];
+    const path = tok.slice(3);
+    paths.push(path);
+    if (x === "R" || x === "C") i++;
+  }
+  return { ok: true, value: paths };
+}
+
+/**
  * Date of the repo's first commit (oldest root commit). Returns `null` when
  * the repo has no commits yet — that is a valid greenfield signal, not an
  * error.
