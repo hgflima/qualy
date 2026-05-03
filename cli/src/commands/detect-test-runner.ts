@@ -192,14 +192,6 @@ function readNumber(value: unknown): number | null {
 const THRESHOLD_KEYS = ["lines", "functions", "branches", "statements"] as const;
 type ThresholdKey = (typeof THRESHOLD_KEYS)[number];
 
-function emptyThresholds(): ThresholdsHit {
-  return { lines: null, functions: null, branches: null, statements: null };
-}
-
-function isAllNull(hit: ThresholdsHit): boolean {
-  return THRESHOLD_KEYS.every((k) => hit[k] === null);
-}
-
 function readThresholdsFromObject(obj: unknown): ThresholdsHit | null {
   if (typeof obj !== "object" || obj === null) return null;
   const o = obj as Record<string, unknown>;
@@ -302,27 +294,38 @@ interface ThresholdsRead {
   readonly source: string;
 }
 
+/**
+ * Walks each candidate config file, parsing JSON via `jsonReader` (vitest- or
+ * jest-shaped) and falling back to the regex-based text reader for JS/TS/MJS
+ * configs. Returns the first non-empty hit, or `null` if no file yields one.
+ */
+function walkConfigsForThresholds(
+  cwd: string,
+  configFiles: readonly string[],
+  readFileFn: (p: string) => string | null,
+  jsonReader: (parsed: unknown) => ThresholdsHit | null,
+): ThresholdsRead | null {
+  for (const file of configFiles) {
+    const text = readFileFn(join(cwd, file));
+    if (text === null) continue;
+    if (file.endsWith(".json")) {
+      const parsed = parseDefensive<unknown>(text);
+      const hit = parsed.ok ? jsonReader(parsed.value) : null;
+      if (hit) return { thresholds: hit, source: file };
+      continue;
+    }
+    const hit = readThresholdsFromText(text);
+    if (hit) return { thresholds: hit, source: file };
+  }
+  return null;
+}
+
 function readVitestThresholds(
   cwd: string,
   configFiles: readonly string[],
   readFileFn: (p: string) => string | null,
 ): ThresholdsRead | null {
-  for (const file of configFiles) {
-    const path = join(cwd, file);
-    const text = readFileFn(path);
-    if (text === null) continue;
-    if (file.endsWith(".json")) {
-      const parsed = parseDefensive<unknown>(text);
-      if (parsed.ok) {
-        const hit = readVitestThresholdsFromJson(parsed.value);
-        if (hit && !isAllNull(hit)) return { thresholds: hit, source: file };
-      }
-      continue;
-    }
-    const hit = readThresholdsFromText(text);
-    if (hit && !isAllNull(hit)) return { thresholds: hit, source: file };
-  }
-  return null;
+  return walkConfigsForThresholds(cwd, configFiles, readFileFn, readVitestThresholdsFromJson);
 }
 
 function readJestThresholdsFromCandidates(
@@ -331,25 +334,11 @@ function readJestThresholdsFromCandidates(
   pkg: PackageJsonShape | null,
   readFileFn: (p: string) => string | null,
 ): ThresholdsRead | null {
-  for (const file of configFiles) {
-    const path = join(cwd, file);
-    const text = readFileFn(path);
-    if (text === null) continue;
-    if (file.endsWith(".json")) {
-      const parsed = parseDefensive<unknown>(text);
-      if (parsed.ok) {
-        const hit = readJestThresholds(parsed.value);
-        if (hit && !isAllNull(hit)) return { thresholds: hit, source: file };
-      }
-      continue;
-    }
-    const hit = readThresholdsFromText(text);
-    if (hit && !isAllNull(hit)) return { thresholds: hit, source: file };
-  }
+  const fromConfig = walkConfigsForThresholds(cwd, configFiles, readFileFn, readJestThresholds);
+  if (fromConfig) return fromConfig;
   if (pkg) {
-    const inline = (pkg as Record<string, unknown>)["jest"];
-    const hit = readJestThresholds(inline);
-    if (hit && !isAllNull(hit)) return { thresholds: hit, source: "package.json#jest" };
+    const hit = readJestThresholds((pkg as Record<string, unknown>)["jest"]);
+    if (hit) return { thresholds: hit, source: "package.json#jest" };
   }
   return null;
 }
@@ -385,10 +374,7 @@ export function detectTestRunner(
   };
 
   for (const def of RUNNERS) {
-    const configs: string[] = [];
-    for (const file of def.configFiles) {
-      if (existsFn(join(cwd, file))) configs.push(file);
-    }
+    const configs: string[] = def.configFiles.filter((file) => existsFn(join(cwd, file)));
     if (pkg) {
       for (const key of def.packageJsonKeys) {
         if (Object.prototype.hasOwnProperty.call(pkg, key) && pkg[key] !== undefined) {
@@ -396,22 +382,12 @@ export function detectTestRunner(
         }
       }
     }
-    let pkgDep = false;
-    if (pkg) {
-      for (const name of def.pkgNames) {
-        if (hasDep(pkg, name)) {
-          pkgDep = true;
-          break;
-        }
-      }
-    }
+    const pkgDep = pkg !== null && def.pkgNames.some((name) => hasDep(pkg, name));
 
-    let read: ThresholdsRead | null = null;
-    if (def.name === "vitest") {
-      read = readVitestThresholds(cwd, def.configFiles, readFileFn);
-    } else {
-      read = readJestThresholdsFromCandidates(cwd, def.configFiles, pkg, readFileFn);
-    }
+    const read =
+      def.name === "vitest"
+        ? readVitestThresholds(cwd, def.configFiles, readFileFn)
+        : readJestThresholdsFromCandidates(cwd, def.configFiles, pkg, readFileFn);
 
     candidates[def.name] = {
       configs,
@@ -422,12 +398,7 @@ export function detectTestRunner(
   }
 
   const runner = pickRunner(candidates.vitest, candidates.jest);
-  const chosen =
-    runner === "vitest"
-      ? candidates.vitest
-      : runner === "jest"
-        ? candidates.jest
-        : null;
+  const chosen = runner === "none" ? null : candidates[runner];
 
   const configured = chosen !== null && (chosen.configs.length > 0 || chosen.pkg_dep);
   const current_thresholds = chosen?.thresholds ?? null;
