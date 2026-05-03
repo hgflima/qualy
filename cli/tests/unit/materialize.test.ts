@@ -152,6 +152,33 @@ describe("materializeFixture", () => {
     expect(pkg.devDependencies?.jest).toBeDefined();
   });
 
+  it("works for the legacy-monorepo fixture (pnpm workspace + 3 packages survive copy)", () => {
+    const fx = materializeFixture("legacy-monorepo");
+    cleanups.push(fx.cleanup);
+
+    expect(existsSync(join(fx.dir, "pnpm-workspace.yaml"))).toBe(true);
+    expect(existsSync(join(fx.dir, "package.json"))).toBe(true);
+    expect(existsSync(join(fx.dir, "EXPECTED.md"))).toBe(false);
+
+    for (const pkg of ["auth", "core", "api"] as const) {
+      expect(existsSync(join(fx.dir, "packages", pkg, "package.json"))).toBe(true);
+      expect(existsSync(join(fx.dir, "packages", pkg, "src", "index.ts"))).toBe(true);
+    }
+
+    const root = JSON.parse(readFileSync(join(fx.dir, "package.json"), "utf8")) as {
+      private?: boolean;
+      packageManager?: string;
+    };
+    expect(root.private).toBe(true);
+    expect(root.packageManager).toMatch(/^pnpm@/);
+
+    const apiPkg = JSON.parse(
+      readFileSync(join(fx.dir, "packages", "api", "package.json"), "utf8"),
+    ) as { dependencies?: Record<string, string> };
+    expect(apiPkg.dependencies?.["@legacy-monorepo/auth"]).toBe("workspace:*");
+    expect(apiPkg.dependencies?.["@legacy-monorepo/core"]).toBe("workspace:*");
+  });
+
   it("rejects fixture names with path separators", () => {
     expect(() => materializeFixture("../etc")).toThrow(/invalid fixture name/);
     expect(() => materializeFixture("foo/bar")).toThrow(/invalid fixture name/);

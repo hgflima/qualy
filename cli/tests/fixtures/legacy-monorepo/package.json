@@ -1,0 +1,13 @@
+{
+  "name": "legacy-monorepo-fixture",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Synthetic legacy pnpm monorepo (3 packages, ~10k LOC, no tests, scattered TODOs) — used as a fixture for qualy detect-* commands and lint-auditor performance budget (SPEC §5 T1, §7.11).",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "build": "echo \"no build\""
+  }
+}
