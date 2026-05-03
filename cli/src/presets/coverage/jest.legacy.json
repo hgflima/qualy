@@ -1,0 +1,15 @@
+{
+  "_comment": "qualy preset · runner=jest · stage=legacy · generated=2026-05-03 · warn-only",
+  "_warnOnly": true,
+  "collectCoverage": true,
+  "coverageProvider": "v8",
+  "coverageReporters": ["text", "json", "json-summary", "html"],
+  "coverageThreshold": {
+    "global": {
+      "lines": 40,
+      "functions": 40,
+      "branches": 30,
+      "statements": 40
+    }
+  }
+}

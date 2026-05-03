@@ -1,6 +1,7 @@
 node_modules/
 dist/
-coverage/
+/coverage/
+/cli/coverage/
 .cache/
 .DS_Store
 *.log

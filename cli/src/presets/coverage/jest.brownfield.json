@@ -1,0 +1,14 @@
+{
+  "_comment": "qualy preset · runner=jest · stage=brownfield · generated=2026-05-03",
+  "collectCoverage": true,
+  "coverageProvider": "v8",
+  "coverageReporters": ["text", "json", "json-summary", "html"],
+  "coverageThreshold": {
+    "global": {
+      "lines": 70,
+      "functions": 70,
+      "branches": 60,
+      "statements": 70
+    }
+  }
+}
