@@ -16,6 +16,7 @@
  *   - Stderr: NDJSON via logger plus the human-readable `--help` text.
  */
 import { runBackupCreate } from "./commands/backup/create.ts";
+import { runBackupList } from "./commands/backup/list.ts";
 import { runDetectExistingLinter } from "./commands/detect-existing-linter.ts";
 import { runDetectStack } from "./commands/detect-stack.ts";
 import { runDetectStage } from "./commands/detect-stage.ts";
@@ -92,6 +93,7 @@ const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> =
  */
 const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>([
   ["backup-create", runBackupCreate],
+  ["backup-list", runBackupList],
   ["detect-stack", runDetectStack],
   ["detect-stage", runDetectStage],
   ["detect-existing-linter", runDetectExistingLinter],
