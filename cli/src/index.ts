@@ -15,6 +15,7 @@
  *   - Stdout: at most one canonical JSON document per invocation (via output()).
  *   - Stderr: NDJSON via logger plus the human-readable `--help` text.
  */
+import { runDetectStack } from "./commands/detect-stack.ts";
 import { EXIT_CODES, type ExitCode } from "./lib/exit-codes.ts";
 import { logger, output } from "./lib/logger.ts";
 
@@ -72,10 +73,23 @@ const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> =
   ["uninstall", "Remove every artifact tracked in .lint-manifest.json"],
 ];
 
+/**
+ * Real handler overrides applied on top of the default `notImplemented` map as
+ * commands are wired phase-by-phase. Keep handlers thin — they parse argv and
+ * delegate to `commands/<name>.ts`.
+ */
+const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>([
+  ["detect-stack", runDetectStack],
+]);
+
 const SUBCOMMANDS: ReadonlyMap<string, Subcommand> = new Map(
   SUBCOMMAND_LIST.map(([name, summary]) => [
     name,
-    { name, summary, handler: notImplemented(name) },
+    {
+      name,
+      summary,
+      handler: HANDLER_OVERRIDES.get(name) ?? notImplemented(name),
+    },
   ]),
 );
 
