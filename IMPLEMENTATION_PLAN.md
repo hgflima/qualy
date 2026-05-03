@@ -16,7 +16,7 @@
 - [x] Criar `cli/src/lib/logger.ts` que escreve mensagens estruturadas em stderr e JSON puro em stdout (why: PLAN §Princípios – CLI emite JSON em stdout, erros em stderr)
 - [x] Criar `cli/src/lib/json.ts` com `parseDefensive` e `stringifyPretty` para evitar throws não-tratados (why: PLAN §File layout – utilitário compartilhado)
 - [x] Criar `cli/src/index.ts` como dispatcher por `process.argv[2]` listando subcomandos vazios e implementando `--help`, `--version` (why: PLAN §Fase 0 verificação; hub que viabiliza chamar qualquer subcomando posteriormente)
-- [ ] Criar `vitest.config.ts` raiz apontando para `cli/tests/unit/**` (why: AGENTS.md – tests via vitest; PLAN §Verification)
+- [x] Criar `vitest.config.ts` raiz apontando para `cli/tests/unit/**` (why: AGENTS.md – tests via vitest; PLAN §Verification)
 - [ ] Criar `install.sh` no raiz que valida `node --version` ≥ 22.6 e copia/symlinka `skills/`, `commands/`, `agents/`, `cli/` para `~/.claude/` (idempotente) (why: PLAN §Fase 0 + ADR 0009 – distribuição manual via script)
 - [ ] Criar `docs/adrs/0006-deterministic-cli-thin-harness.md` registrando a decisão central (why: PLAN §Fase 0 lista ADRs obrigatórios)
 - [ ] Criar `docs/adrs/0007-runtime-ts-strip-types.md` (why: PLAN §Fase 0 lista ADRs obrigatórios; justifica Node 22.6+)
