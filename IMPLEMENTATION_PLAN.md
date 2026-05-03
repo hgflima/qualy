@@ -9,7 +9,7 @@
 ## Priority 1: Fase 0 — Bootstrap do workspace
 
 - [x] Criar `package.json` raiz com campos `name="qualy"`, `private:true`, `type:"module"`, `engines.node:">=22.6.0"`, scripts placeholder (`test`, `test:e2e`) (why: PLAN §Fase 0; pré-condição para qualquer outro comando npm/pnpm)
-- [ ] Criar `tsconfig.json` raiz com `target:"ES2023"`, `module:"NodeNext"`, `moduleResolution:"NodeNext"`, `strict:true`, `noEmit:true` (why: PLAN §Fase 0; viabiliza `tsc --noEmit` da validação por iteração em AGENTS.md)
+- [x] Criar `tsconfig.json` raiz com `target:"ES2023"`, `module:"NodeNext"`, `moduleResolution:"NodeNext"`, `strict:true`, `noEmit:true` (why: PLAN §Fase 0; viabiliza `tsc --noEmit` da validação por iteração em AGENTS.md)
 - [ ] Criar `cli/package.json` com deps runtime mínimas (`ts-morph`, `vitest`, `chart.js`, `chartjs-plugin-treemap`, `esbuild`) (why: PLAN §Critical files; declara dependências em isolado do harness)
 - [ ] Criar `cli/tsconfig.json` estendendo o raiz, `rootDir:"./src"` (why: PLAN §File layout; isolamento de paths)
 - [ ] Criar `cli/src/lib/exit-codes.ts` exportando constantes (`OK=0`, `RECOVERABLE_ERROR=1`, `UNSUPPORTED_STACK=2`, `DIRTY_TREE=3`, etc.) (why: PLAN §Contratos CLI – exit codes semânticos documentados)
