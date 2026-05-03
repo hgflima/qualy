@@ -14,7 +14,7 @@
 - [x] Criar `cli/tsconfig.json` estendendo o raiz, `rootDir:"./src"` (why: PLAN §File layout; isolamento de paths)
 - [x] Criar `cli/src/lib/exit-codes.ts` exportando constantes (`OK=0`, `RECOVERABLE_ERROR=1`, `UNSUPPORTED_STACK=2`, `DIRTY_TREE=3`, etc.) (why: PLAN §Contratos CLI – exit codes semânticos documentados)
 - [x] Criar `cli/src/lib/logger.ts` que escreve mensagens estruturadas em stderr e JSON puro em stdout (why: PLAN §Princípios – CLI emite JSON em stdout, erros em stderr)
-- [ ] Criar `cli/src/lib/json.ts` com `parseDefensive` e `stringifyPretty` para evitar throws não-tratados (why: PLAN §File layout – utilitário compartilhado)
+- [x] Criar `cli/src/lib/json.ts` com `parseDefensive` e `stringifyPretty` para evitar throws não-tratados (why: PLAN §File layout – utilitário compartilhado)
 - [ ] Criar `cli/src/index.ts` como dispatcher por `process.argv[2]` listando subcomandos vazios e implementando `--help`, `--version` (why: PLAN §Fase 0 verificação; hub que viabiliza chamar qualquer subcomando posteriormente)
 - [ ] Criar `vitest.config.ts` raiz apontando para `cli/tests/unit/**` (why: AGENTS.md – tests via vitest; PLAN §Verification)
 - [ ] Criar `install.sh` no raiz que valida `node --version` ≥ 22.6 e copia/symlinka `skills/`, `commands/`, `agents/`, `cli/` para `~/.claude/` (idempotente) (why: PLAN §Fase 0 + ADR 0009 – distribuição manual via script)
