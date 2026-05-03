@@ -9,13 +9,17 @@
  * so the harness `.md` files and CI invoke `vitest` from one place. The
  * `cli/package.json` `test` script delegates here.
  *
- * Scope is intentionally narrow for now — `cli/tests/e2e/` is added in Fase 7.
+ * Scope: unit suites under `cli/tests/unit/**` and the harness-orchestration
+ * e2e suites under `cli/tests/e2e/**`. The latter materialize fixtures (cp +
+ * `git init` + commit) and exercise install-* layers against real on-disk
+ * trees, so they pay the round-trip cost; today's set is small enough that
+ * the combined backpressure suite still runs in a few seconds.
  */
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["cli/tests/unit/**/*.test.ts"],
+    include: ["cli/tests/unit/**/*.test.ts", "cli/tests/e2e/**/*.test.ts"],
     environment: "node",
     reporters: ["default"],
     passWithNoTests: false,
