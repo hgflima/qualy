@@ -7,10 +7,13 @@
   "engines": {
     "node": ">=22.6.0"
   },
+  "workspaces": [
+    "cli"
+  ],
   "scripts": {
-    "typecheck": "echo \"[qualy] typecheck: not yet wired (waiting for tsconfig.json + cli/)\" && exit 0",
+    "typecheck": "npm run typecheck --workspace @qualy/cli",
     "lint": "echo \"[qualy] lint: not yet wired (oxlint installed in a later phase)\" && exit 0",
-    "test": "echo \"[qualy] test: not yet wired (vitest config + tests added in a later phase)\" && exit 0",
+    "test": "vitest run",
     "test:e2e": "echo \"[qualy] test:e2e: not yet wired (added in Fase 7)\" && exit 0",
     "build": "echo \"[qualy] build: noop — Node 22.6+ executes .ts directly via --experimental-strip-types\" && exit 0"
   }
