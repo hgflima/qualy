@@ -20,6 +20,7 @@ import { runDetectStack } from "./commands/detect-stack.ts";
 import { runDetectStage } from "./commands/detect-stage.ts";
 import { runDetectTestRunner } from "./commands/detect-test-runner.ts";
 import { runGitCleanCheck } from "./commands/git-clean-check.ts";
+import { runInstallOxlint } from "./commands/install/oxlint.ts";
 import { runStatus } from "./commands/status.ts";
 import { EXIT_CODES, type ExitCode } from "./lib/exit-codes.ts";
 import { logger, output } from "./lib/logger.ts";
@@ -89,6 +90,7 @@ const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ["detect-existing-linter", runDetectExistingLinter],
   ["detect-test-runner", runDetectTestRunner],
   ["git-clean-check", runGitCleanCheck],
+  ["install-oxlint", runInstallOxlint],
   ["status", runStatus],
 ]);
 
