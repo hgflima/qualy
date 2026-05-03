@@ -1,0 +1,12 @@
+{
+  "_comment": "qualy · package.json scripts snippet (SPEC §7.1) · install-scripts.ts merges 'scripts' into the target package.json#scripts and selects the 'coverage' value from 'coverage_by_runner' using the runner reported by detect-test-runner (vitest|jest); when runner is 'none' no 'coverage' script is written.",
+  "scripts": {
+    "lint": "oxlint --config oxlint.fast.json .",
+    "lint:deep": "oxlint --config oxlint.deep.json .",
+    "format": "oxfmt --write ."
+  },
+  "coverage_by_runner": {
+    "vitest": "vitest run --coverage",
+    "jest": "jest --coverage"
+  }
+}
