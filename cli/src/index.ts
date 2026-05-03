@@ -15,6 +15,7 @@
  *   - Stdout: at most one canonical JSON document per invocation (via output()).
  *   - Stderr: NDJSON via logger plus the human-readable `--help` text.
  */
+import { runBackupCreate } from "./commands/backup/create.ts";
 import { runDetectExistingLinter } from "./commands/detect-existing-linter.ts";
 import { runDetectStack } from "./commands/detect-stack.ts";
 import { runDetectStage } from "./commands/detect-stage.ts";
@@ -90,6 +91,7 @@ const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> =
  * delegate to `commands/<name>.ts`.
  */
 const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>([
+  ["backup-create", runBackupCreate],
   ["detect-stack", runDetectStack],
   ["detect-stage", runDetectStage],
   ["detect-existing-linter", runDetectExistingLinter],
