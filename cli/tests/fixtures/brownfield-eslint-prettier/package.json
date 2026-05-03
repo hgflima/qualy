@@ -1,0 +1,23 @@
+{
+  "name": "brownfield-eslint-prettier-fixture",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "description": "Synthetic brownfield TypeScript project with ESLint + Prettier configured — used as a fixture for qualy detect-* commands (SPEC §5 T1, §7.2).",
+  "scripts": {
+    "start": "node --experimental-strip-types src/index.ts",
+    "lint": "eslint src/",
+    "format": "prettier --write src/"
+  },
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4"
+  }
+}
