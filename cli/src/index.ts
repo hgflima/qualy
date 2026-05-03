@@ -15,6 +15,7 @@
  *   - Stdout: at most one canonical JSON document per invocation (via output()).
  *   - Stderr: NDJSON via logger plus the human-readable `--help` text.
  */
+import { runDetectExistingLinter } from "./commands/detect-existing-linter.ts";
 import { runDetectStack } from "./commands/detect-stack.ts";
 import { runGitCleanCheck } from "./commands/git-clean-check.ts";
 import { EXIT_CODES, type ExitCode } from "./lib/exit-codes.ts";
@@ -81,6 +82,7 @@ const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> =
  */
 const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>([
   ["detect-stack", runDetectStack],
+  ["detect-existing-linter", runDetectExistingLinter],
   ["git-clean-check", runGitCleanCheck],
 ]);
 
