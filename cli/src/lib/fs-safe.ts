@@ -98,6 +98,11 @@ export interface SafeWriteOptions {
   readonly merged?: boolean;
   /** Optional file mode (e.g. `0o755` for `post-edit.sh`). */
   readonly mode?: number;
+  /**
+   * Skip manifest registration. Used by `backup-restore` which writes back to
+   * user-owned files (the original locations) — those are never qualy-owned.
+   */
+  readonly skipManifest?: boolean;
 }
 
 export interface SafeWriteOk {
@@ -370,7 +375,7 @@ export function safeWriteFile(
   const isManifest = posixRel === MANIFEST_FILENAME;
 
   let recorded = false;
-  if (!isManifest) {
+  if (!isManifest && !opts.skipManifest) {
     const now = io.now ? io.now() : new Date();
     recordEntry(
       cwd,
