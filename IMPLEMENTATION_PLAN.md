@@ -11,7 +11,7 @@
 - [x] Criar `package.json` raiz com campos `name="qualy"`, `private:true`, `type:"module"`, `engines.node:">=22.6.0"`, scripts placeholder (`test`, `test:e2e`) (why: PLAN §Fase 0; pré-condição para qualquer outro comando npm/pnpm)
 - [x] Criar `tsconfig.json` raiz com `target:"ES2023"`, `module:"NodeNext"`, `moduleResolution:"NodeNext"`, `strict:true`, `noEmit:true` (why: PLAN §Fase 0; viabiliza `tsc --noEmit` da validação por iteração em AGENTS.md)
 - [x] Criar `cli/package.json` com deps runtime mínimas (`ts-morph`, `vitest`, `chart.js`, `chartjs-plugin-treemap`, `esbuild`) (why: PLAN §Critical files; declara dependências em isolado do harness)
-- [ ] Criar `cli/tsconfig.json` estendendo o raiz, `rootDir:"./src"` (why: PLAN §File layout; isolamento de paths)
+- [x] Criar `cli/tsconfig.json` estendendo o raiz, `rootDir:"./src"` (why: PLAN §File layout; isolamento de paths)
 - [ ] Criar `cli/src/lib/exit-codes.ts` exportando constantes (`OK=0`, `RECOVERABLE_ERROR=1`, `UNSUPPORTED_STACK=2`, `DIRTY_TREE=3`, etc.) (why: PLAN §Contratos CLI – exit codes semânticos documentados)
 - [ ] Criar `cli/src/lib/logger.ts` que escreve mensagens estruturadas em stderr e JSON puro em stdout (why: PLAN §Princípios – CLI emite JSON em stdout, erros em stderr)
 - [ ] Criar `cli/src/lib/json.ts` com `parseDefensive` e `stringifyPretty` para evitar throws não-tratados (why: PLAN §File layout – utilitário compartilhado)
