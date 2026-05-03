@@ -1,0 +1,13 @@
+{
+  "name": "greenfield-ts-fixture",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Synthetic greenfield TypeScript project with no linter — used as a fixture for qualy detect-* commands.",
+  "scripts": {
+    "start": "node --experimental-strip-types src/index.ts"
+  },
+  "engines": {
+    "node": ">=22.6.0"
+  }
+}
