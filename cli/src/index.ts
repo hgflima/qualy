@@ -22,6 +22,7 @@ import { runDetectTestRunner } from "./commands/detect-test-runner.ts";
 import { runGitCleanCheck } from "./commands/git-clean-check.ts";
 import { runInstallDeps } from "./commands/install/deps.ts";
 import { runInstallHook } from "./commands/install/hook.ts";
+import { runInstallHusky } from "./commands/install/husky.ts";
 import { runInstallOxlint } from "./commands/install/oxlint.ts";
 import { runInstallScripts } from "./commands/install/scripts.ts";
 import { runStatus } from "./commands/status.ts";
@@ -95,6 +96,7 @@ const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ["git-clean-check", runGitCleanCheck],
   ["install-deps", runInstallDeps],
   ["install-hook", runInstallHook],
+  ["install-husky", runInstallHusky],
   ["install-oxlint", runInstallOxlint],
   ["install-scripts", runInstallScripts],
   ["status", runStatus],
