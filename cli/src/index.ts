@@ -17,6 +17,7 @@
  */
 import { runDetectExistingLinter } from "./commands/detect-existing-linter.ts";
 import { runDetectStack } from "./commands/detect-stack.ts";
+import { runDetectTestRunner } from "./commands/detect-test-runner.ts";
 import { runGitCleanCheck } from "./commands/git-clean-check.ts";
 import { EXIT_CODES, type ExitCode } from "./lib/exit-codes.ts";
 import { logger, output } from "./lib/logger.ts";
@@ -83,6 +84,7 @@ const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> =
 const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>([
   ["detect-stack", runDetectStack],
   ["detect-existing-linter", runDetectExistingLinter],
+  ["detect-test-runner", runDetectTestRunner],
   ["git-clean-check", runGitCleanCheck],
 ]);
 
