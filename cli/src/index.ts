@@ -20,6 +20,7 @@ import { runDetectStack } from "./commands/detect-stack.ts";
 import { runDetectStage } from "./commands/detect-stage.ts";
 import { runDetectTestRunner } from "./commands/detect-test-runner.ts";
 import { runGitCleanCheck } from "./commands/git-clean-check.ts";
+import { runInstallDeps } from "./commands/install/deps.ts";
 import { runInstallHook } from "./commands/install/hook.ts";
 import { runInstallOxlint } from "./commands/install/oxlint.ts";
 import { runInstallScripts } from "./commands/install/scripts.ts";
@@ -92,6 +93,7 @@ const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ["detect-existing-linter", runDetectExistingLinter],
   ["detect-test-runner", runDetectTestRunner],
   ["git-clean-check", runGitCleanCheck],
+  ["install-deps", runInstallDeps],
   ["install-hook", runInstallHook],
   ["install-oxlint", runInstallOxlint],
   ["install-scripts", runInstallScripts],

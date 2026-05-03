@@ -38,8 +38,15 @@ export const MANIFEST_VERSION = "1" as const;
 /**
  * Categorical tag stored alongside each manifest entry. Uninstall (Phase 3)
  * uses it to decide deletion strategy: "preset"/"hook"/"husky"/"lintstaged"/
- * "decisions" are owned by qualy and deleted; "settings"/"scripts"/"coverage"
- * are merged into pre-existing files and require restore-from-backup instead.
+ * "decisions" are owned by qualy and deleted; "settings"/"scripts"/"coverage"/
+ * "dep" are merged into pre-existing files and require surgical removal
+ * instead.
+ *
+ * "dep" entries are virtual (path = `package.json#devDependencies/<name>`) —
+ * the package manager is the writer of `package.json`, and we record one entry
+ * per installed package so uninstall can `pkg-manager remove` exactly the set
+ * we added. They are flagged `merged: true` so uninstall never deletes
+ * `package.json`.
  */
 export type ManifestEntryKind =
   | "preset"
@@ -51,6 +58,7 @@ export type ManifestEntryKind =
   | "coverage"
   | "decisions"
   | "template"
+  | "dep"
   | "other";
 
 export interface ManifestEntry {
