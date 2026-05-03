@@ -133,6 +133,25 @@ describe("materializeFixture", () => {
     expect(existsSync(join(fx.dir, "src", "unsupported_python", "main.py"))).toBe(true);
   });
 
+  it("works for the jest-with-coverage fixture (jest.config.js + threshold survive copy)", () => {
+    const fx = materializeFixture("jest-with-coverage");
+    cleanups.push(fx.cleanup);
+
+    expect(existsSync(join(fx.dir, "jest.config.js"))).toBe(true);
+    expect(existsSync(join(fx.dir, "package.json"))).toBe(true);
+    expect(existsSync(join(fx.dir, "src"))).toBe(true);
+    expect(existsSync(join(fx.dir, "EXPECTED.md"))).toBe(false);
+
+    const jestConfig = readFileSync(join(fx.dir, "jest.config.js"), "utf8");
+    expect(jestConfig).toMatch(/coverageThreshold/);
+    expect(jestConfig).toMatch(/lines\s*:\s*60/);
+
+    const pkg = JSON.parse(readFileSync(join(fx.dir, "package.json"), "utf8")) as {
+      devDependencies?: Record<string, string>;
+    };
+    expect(pkg.devDependencies?.jest).toBeDefined();
+  });
+
   it("rejects fixture names with path separators", () => {
     expect(() => materializeFixture("../etc")).toThrow(/invalid fixture name/);
     expect(() => materializeFixture("foo/bar")).toThrow(/invalid fixture name/);
