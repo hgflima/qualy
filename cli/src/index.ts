@@ -22,6 +22,7 @@ import { runDetectTestRunner } from "./commands/detect-test-runner.ts";
 import { runGitCleanCheck } from "./commands/git-clean-check.ts";
 import { runInstallHook } from "./commands/install/hook.ts";
 import { runInstallOxlint } from "./commands/install/oxlint.ts";
+import { runInstallScripts } from "./commands/install/scripts.ts";
 import { runStatus } from "./commands/status.ts";
 import { EXIT_CODES, type ExitCode } from "./lib/exit-codes.ts";
 import { logger, output } from "./lib/logger.ts";
@@ -93,6 +94,7 @@ const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ["git-clean-check", runGitCleanCheck],
   ["install-hook", runInstallHook],
   ["install-oxlint", runInstallOxlint],
+  ["install-scripts", runInstallScripts],
   ["status", runStatus],
 ]);
 
