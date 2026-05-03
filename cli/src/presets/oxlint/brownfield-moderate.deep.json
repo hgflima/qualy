@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "_comment": "qualy preset · stage=brownfield-moderate · tier=deep · generated=2026-05-03",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "plugins": ["quality-metrics"],
+  "rules": {
+    "quality-metrics/wmc": ["error", { "max": 20 }],
+    "quality-metrics/halstead-volume": ["warn", { "max": 1000 }],
+    "quality-metrics/halstead-effort": ["warn", { "max": 400 }],
+    "quality-metrics/lcom": ["warn", { "max": 2 }],
+    "quality-metrics/cbo": ["error", { "max": 10 }],
+    "quality-metrics/dit": ["warn", { "max": 5 }]
+  }
+}
