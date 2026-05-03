@@ -28,7 +28,7 @@
 
 ## Priority 2: Fase 1 — Detecção (read-only)
 
-- [ ] Criar `cli/src/lib/git.ts` com wrappers (`isClean`, `firstCommitDate`, `churn90d`, `lsFilesByExt`) chamando `git` via `child_process` (why: PLAN §File layout; base usada por múltiplos detectores)
+- [x] Criar `cli/src/lib/git.ts` com wrappers (`isClean`, `firstCommitDate`, `churn90d`, `lsFilesByExt`) chamando `git` via `child_process` (why: PLAN §File layout; base usada por múltiplos detectores). Implementado com `execFileSync` (sem shell), seam testável `setGitRunner`, e retorno `GitResult<T>` discriminado para que detectores tratem repos vazios e falhas sem throw. 19 testes unit cobrindo paths felizes, repo vazio, datas inválidas, dedup de pathspecs e validação de extensões. Convém: `firstCommitDate` retorna `null` para repos sem commits; `churn90d` 0; `lsFilesByExt` recusa extensões com `/`, `\` ou whitespace.
 - [ ] Criar `cli/src/lib/pkg-manager.ts` que detecta gerenciador a partir do lockfile (`bun.lockb` → bun, `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, default npm) (why: AGENTS.md – detecção por lockfile)
 - [ ] Implementar `cli/src/commands/detect-stack.ts` (lê `package.json`, classifica `.ts/.tsx/.js/.jsx` como suportado; resto bloqueia) (why: SPEC §1 stack suportada – única lista que oxc cobre)
 - [ ] Implementar `cli/src/commands/git-clean-check.ts` (why: SPEC §6 Always – exigir tree limpa antes de mudanças)
