@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.cache/
+.DS_Store
+*.log
+.lint-audit/
+.lint-backup/
+.lint-manifest.json
+.ralph_stuck_tracker
+ralph.log

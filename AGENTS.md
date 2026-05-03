@@ -28,10 +28,12 @@ All four must pass before commit.
 
 ## Constraints
 
-- `cli/package.json` pins `chartjs-plugin-treemap@^3.1.0`, which 404s on the npm
-  registry. Until the version is corrected (or the dep moved to a later phase
-  that actually needs it — Fase 6 / report), `npm install --prefix cli` fails
-  end-to-end and `tsc`/`vitest` cannot be run from disk. Until then, validate
-  Phase 0 work by running the dispatcher directly:
-  `node --experimental-strip-types cli/src/index.ts --help` and the
-  package-level placeholder scripts (`npm run typecheck|lint|test|build`).
+- `vitest.config.ts` lives at the repo root but `vitest` is only installed in
+  `cli/node_modules/`, so `npx vitest` from either root or `cli/` fails to load
+  the config (`Cannot find package 'vitest'`). Until vitest is hoisted (root
+  devDep or workspaces), unit tests must be invoked through the cli prefix in
+  a way that resolves both the binary and the package — current root scripts
+  remain placeholder `echo` stubs that exit 0 (per Priority 1 task in
+  `IMPLEMENTATION_PLAN.md`). Validate Phase 0 work by running the dispatcher
+  directly: `node --experimental-strip-types cli/src/index.ts --help` plus
+  `npm run typecheck --prefix cli`.
