@@ -265,6 +265,10 @@ function defaultRead(p: string): string | null {
 function defaultExists(p: string): boolean {
   return existsSync(p);
 }
+// keep defaultExists referenced for parity with rules-remove (symmetric DI
+// surface — `existsFn` is in the deps interface even though `rulesAdd` only
+// consumes `readFileFn` for now).
+void defaultExists;
 
 function defaultAuthor(cwd: string): string {
   try {
@@ -409,7 +413,6 @@ function resolveSettings(
   userMax: number | undefined,
 ): { ok: true; value: ResolvedSettings } | { ok: false; error: ResolveErr } {
   const isQM = rule.startsWith("quality-metrics/");
-  const isCategory = rule.startsWith("category:");
 
   let severity: RuleSeverity | undefined = userSeverity;
   let max: number | undefined = userMax;
@@ -422,7 +425,7 @@ function resolveSettings(
     if (severity === undefined && existing !== null) {
       severity = existing.severity;
     }
-    if (severity === undefined && (isCategory || (!isQM && !isCategory))) {
+    if (severity === undefined && !isQM) {
       severity = "warn";
     }
     if (severity === undefined) {
@@ -561,15 +564,15 @@ function buildDecisionFields(
 }
 
 function formatDecisionEntry(fields: DecisionFields): string {
-  const lines: string[] = [];
-  lines.push(`### ${fields.timestamp} — ${fields.kind}: ${fields.subject}`);
-  lines.push("");
-  lines.push(`- **kind**: ${fields.kind}`);
-  lines.push(`- **rule**: ${fields.rule}`);
-  lines.push(`- **author**: ${fields.author}`);
-  lines.push(`- **reason**: ${fields.reason}`);
-  lines.push("");
-  return lines.join("\n");
+  return [
+    `### ${fields.timestamp} — ${fields.kind}: ${fields.subject}`,
+    "",
+    `- **kind**: ${fields.kind}`,
+    `- **rule**: ${fields.rule}`,
+    `- **author**: ${fields.author}`,
+    `- **reason**: ${fields.reason}`,
+    "",
+  ].join("\n");
 }
 
 /** Inserts `entryText` between the qualy entry markers, preserving any
@@ -660,6 +663,10 @@ function addFile(out: Set<string>, raw: unknown): void {
   if (file !== undefined) out.add(file);
 }
 
+function oxlintArgs(cfg: string): readonly string[] {
+  return ["--config", cfg, "--format", "json", "."];
+}
+
 interface BlastRadiusInputs {
   readonly cwd: string;
   readonly presetRel: string;
@@ -691,29 +698,22 @@ function measureBlast(
       };
     }
 
-    const args = (cfg: string): readonly string[] => [
-      "--config",
-      cfg,
-      "--format",
-      "json",
-      ".",
-    ];
-    const cur = inputs.runFn(inputs.oxlintBin, args(inputs.currentPresetAbs), inputs.cwd);
-    if (!cur.ok && cur.stdout.length === 0) {
-      return {
-        ok: false,
-        error: "oxlint_missing",
-        reason: `${inputs.oxlintBin}: ${cur.stderr.trim() || "binary not found"}`,
-      };
-    }
-    const prop = inputs.runFn(inputs.oxlintBin, args(proposedPath), inputs.cwd);
-    if (!prop.ok && prop.stdout.length === 0) {
-      return {
-        ok: false,
-        error: "oxlint_missing",
-        reason: `${inputs.oxlintBin}: ${prop.stderr.trim() || "binary not found"}`,
-      };
-    }
+    const oxlintMissing = (
+      r: ReturnType<RunFn>,
+    ): { ok: false; error: string; reason: string } | null =>
+      !r.ok && r.stdout.length === 0
+        ? {
+            ok: false,
+            error: "oxlint_missing",
+            reason: `${inputs.oxlintBin}: ${r.stderr.trim() || "binary not found"}`,
+          }
+        : null;
+    const cur = inputs.runFn(inputs.oxlintBin, oxlintArgs(inputs.currentPresetAbs), inputs.cwd);
+    const curErr = oxlintMissing(cur);
+    if (curErr !== null) return curErr;
+    const prop = inputs.runFn(inputs.oxlintBin, oxlintArgs(proposedPath), inputs.cwd);
+    const propErr = oxlintMissing(prop);
+    if (propErr !== null) return propErr;
     const curFiles = violatingFiles(cur.stdout);
     const propFiles = violatingFiles(prop.stdout);
     let newly = 0;
