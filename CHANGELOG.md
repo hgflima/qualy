@@ -13,6 +13,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.1.0] — 2026-05-04
+
+### Added
+
+- `qualy install --scope <user|project|local>` — instala o harness via `npx`,
+  copiando `skills/`, `commands/`, `agents/` para o escopo escolhido com
+  registro determinístico em `.qualy-manifest.json` (SPEC §3).
+- `qualy uninstall --scope <user|project|local>` — remove byte-a-byte tudo
+  que estiver listado no `.qualy-manifest.json` do escopo, sem afetar
+  arquivos não rastreados.
+- `qualy update --scope <user|project|local>` — refaz a cópia a partir do
+  payload da versão atual, mantendo o manifesto consistente; mapeia 4
+  classes de erro de rede/registry para mensagens recuperáveis.
+
+### Breaking
+
+- `qualy uninstall` (lint-stack) → renomeado para `qualy lint-uninstall`
+  (D1). O nome `uninstall` agora pertence ao harness installer; quem
+  precisa desinstalar a stack `oxlint+oxfmt+quality-metrics` deve usar
+  `qualy lint-uninstall` ou `/lint:uninstall`.
+
 ### Added
 
 - **CLI dispatcher** (`cli/src/index.ts`) with `--help`, `--version`, semantic
@@ -83,4 +106,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/hgflima/qualy/commits/main
+[Unreleased]: https://github.com/hgflima/qualy/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/hgflima/qualy/releases/tag/v0.1.0
