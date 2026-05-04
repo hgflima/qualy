@@ -46,7 +46,7 @@ After install, restart Claude Code (or open a new session) so it picks up the ne
 
 > **Note:** `./install.sh --dev` is **only** for developers working on qualy itself (symlink mode against a local clone). End users should always go through `npx @hgflima/qualy install`.
 
-See [`.harn/docs/npx-installer/SPEC.md`](.harn/docs/npx-installer/SPEC.md) for the full installer specification (scope resolution, manifest schema, error classes).
+See [`.harn/docs/npx-installer/SPEC.md`](.harn/docs/npx-installer/SPEC.md) for the full installer specification (scope resolution, manifest schema, error classes), and [`docs/adrs/0010-npm-distribution.md`](docs/adrs/0010-npm-distribution.md) for the rationale behind shipping via npm (D1–D5: rename, manifest discriminator, bin shim, `npm view` for `update`, version skew between root and `cli/`).
 
 ## Slash commands
 
