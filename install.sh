@@ -236,6 +236,18 @@ install_cli() {
 
 main() {
   parse_args "$@"
+
+  # Soft deprecation (TASKS.md 4.2 + SPEC §6 paridade): the recommended path
+  # for end users is `npx qualy install`. The bash installer is kept around
+  # only for qualy maintainers iterating on the harness via `--dev` symlinks
+  # (SPEC §1 user 4). Print an advisory note when the user invokes the legacy
+  # path, but never block — the script keeps running so existing scripts and
+  # CI jobs remain functional.
+  if [[ "$INSTALL_MODE" != "symlink" ]]; then
+    log "note: o caminho recomendado agora é \`npx qualy install\`."
+    log "Use \`--dev\` apenas se estiver desenvolvendo o qualy localmente."
+  fi
+
   require_node
 
   log "mode=$INSTALL_MODE  source=$SOURCE_ROOT  target=$TARGET_ROOT  dry_run=$DRY_RUN"
