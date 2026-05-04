@@ -7,6 +7,14 @@
   "engines": {
     "node": ">=22.6.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hgflima/qualy.git"
+  },
+  "homepage": "https://github.com/hgflima/qualy#readme",
+  "bugs": {
+    "url": "https://github.com/hgflima/qualy/issues"
+  },
   "bin": {
     "qualy": "bin/qualy.mjs"
   },
