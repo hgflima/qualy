@@ -40,6 +40,7 @@ import { runRulesList } from "./commands/rules/list.ts";
 import { runRulesRemove } from "./commands/rules/remove.ts";
 import { runStatus } from "./commands/status.ts";
 import { runUninstall } from "./commands/uninstall.ts";
+import { runReportData } from "./report/data-loader.ts";
 import { EXIT_CODES, type ExitCode } from "./lib/exit-codes.ts";
 import { logger, output } from "./lib/logger.ts";
 
@@ -92,6 +93,7 @@ const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> =
   ["rules-remove", "Disable a rule (--reason required) and log decision"],
   ["rules-explain", "Explain a rule: description, rationale, threshold, links"],
   ["status", "Aggregate versions, presets, stage, hooks, coverage, theme"],
+  ["report-data", "Aggregate audit + history + coverage + git into report JSON"],
   ["report-serve", "Serve the visual report on 127.0.0.1 (long-running)"],
   ["report-export", "Write a self-contained HTML report"],
   ["uninstall", "Remove every artifact tracked in .lint-manifest.json"],
@@ -128,6 +130,7 @@ const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ["rules-remove", runRulesRemove],
   ["status", runStatus],
   ["uninstall", runUninstall],
+  ["report-data", runReportData],
 ]);
 
 const SUBCOMMANDS: ReadonlyMap<string, Subcommand> = new Map(
