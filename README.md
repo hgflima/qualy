@@ -13,21 +13,40 @@ Deterministic CLI + thin Claude Code harness for `oxlint` + `oxfmt` + `quality-m
 
 Stack support is binary: `.ts/.tsx/.js/.jsx` only. Python, Go, Rust, Vue/Svelte SFC, etc. are recused with `exit 2` (`UNSUPPORTED_STACK`). See `docs/compatibility.md` and `docs/adrs/0001-oxc-only-v1.md`.
 
-## Install
+## Installation
+
+Three scopes are supported. Pick the one that matches your workflow.
+
+### `--scope user` — personal tool, every project
+
+Use when qualy is part of your personal toolkit and you want it available across every project on your machine. Installs into `~/.claude/`.
 
 ```bash
-git clone <this-repo> qualy
-cd qualy
-./install.sh                 # copy mode (default) — installs into ~/.claude/
-./install.sh --dev           # symlink mode — source edits take effect immediately
-./install.sh --target /path  # alternate install root
-./install.sh --dry-run       # show what would happen
-./install.sh --help
+npx @hgflima/qualy install --scope user
 ```
 
-The installer copies `skills/lint/`, `commands/lint/`, `agents/lint-*.md`, and the `cli/` workspace into `<target>/skills/lint/cli/`. Re-running is idempotent. It refuses to delete anything outside `<target>/`. Node version is checked before any write.
+### `--scope project` — team-wide, versioned in the repo (default)
 
-Restart Claude Code (or open a new session) so it picks up the new skill / commands / subagents.
+Use when the whole team should share the same harness. Installs into `<repo>/.claude/` and you commit it. Requires the working directory to be a git repository.
+
+```bash
+npx @hgflima/qualy install --scope project
+# or simply: npx @hgflima/qualy install
+```
+
+### `--scope local` — solo experimentation, gitignored
+
+Use when you want to try qualy in a repo without affecting teammates. Installs into `<repo>/.claude/` and adds `.claude/` to `.gitignore` automatically.
+
+```bash
+npx @hgflima/qualy install --scope local
+```
+
+After install, restart Claude Code (or open a new session) so it picks up the new skill, commands, and subagents. Re-running is idempotent. To remove everything tracked in the manifest, run `npx @hgflima/qualy uninstall`.
+
+> **Note:** `./install.sh --dev` is **only** for developers working on qualy itself (symlink mode against a local clone). End users should always go through `npx @hgflima/qualy install`.
+
+See [`.harn/docs/npx-installer/SPEC.md`](.harn/docs/npx-installer/SPEC.md) for the full installer specification (scope resolution, manifest schema, error classes).
 
 ## Slash commands
 
