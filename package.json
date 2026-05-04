@@ -1,12 +1,25 @@
 {
   "name": "qualy",
   "version": "0.0.0",
-  "private": true,
+  "private": false,
   "type": "module",
   "description": "Deterministic CLI + thin Claude Code harness for the qualy/lint skill (oxlint + oxfmt + quality-metrics).",
   "engines": {
     "node": ">=22.6.0"
   },
+  "bin": {
+    "qualy": "bin/qualy.mjs"
+  },
+  "files": [
+    "bin/",
+    "cli/src/",
+    "skills/",
+    "commands/",
+    "agents/",
+    "package.json",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "workspaces": [
     "cli"
   ],
