@@ -37,6 +37,7 @@ import { runRecsGenerate } from "./commands/recs/generate.ts";
 import { runRulesAdd } from "./commands/rules/add.ts";
 import { runRulesExplain } from "./commands/rules/explain.ts";
 import { runRulesList } from "./commands/rules/list.ts";
+import { runRulesRemove } from "./commands/rules/remove.ts";
 import { runStatus } from "./commands/status.ts";
 import { runUninstall } from "./commands/uninstall.ts";
 import { EXIT_CODES, type ExitCode } from "./lib/exit-codes.ts";
@@ -124,6 +125,7 @@ const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ["rules-add", runRulesAdd],
   ["rules-explain", runRulesExplain],
   ["rules-list", runRulesList],
+  ["rules-remove", runRulesRemove],
   ["status", runStatus],
   ["uninstall", runUninstall],
 ]);
