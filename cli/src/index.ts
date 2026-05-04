@@ -31,6 +31,7 @@ import { runInstallHook } from "./commands/install/hook.ts";
 import { runInstallHusky } from "./commands/install/husky.ts";
 import { runInstallOxlint } from "./commands/install/oxlint.ts";
 import { runInstallScripts } from "./commands/install/scripts.ts";
+import { runRecsBlastRadius } from "./commands/recs/blast-radius.ts";
 import { runRecsGenerate } from "./commands/recs/generate.ts";
 import { runStatus } from "./commands/status.ts";
 import { runUninstall } from "./commands/uninstall.ts";
@@ -113,6 +114,7 @@ const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ["install-husky", runInstallHusky],
   ["install-oxlint", runInstallOxlint],
   ["install-scripts", runInstallScripts],
+  ["recs-blast-radius", runRecsBlastRadius],
   ["recs-generate", runRecsGenerate],
   ["status", runStatus],
   ["uninstall", runUninstall],
