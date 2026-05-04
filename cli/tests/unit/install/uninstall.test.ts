@@ -25,7 +25,7 @@ import { EXIT_CODES } from "../../../src/lib/exit-codes.ts";
 function makePayload(root: string, version = "0.1.0"): void {
   writeFileSync(
     join(root, "package.json"),
-    JSON.stringify({ name: "qualy", version }),
+    JSON.stringify({ name: "@hgflima/qualy", version }),
     "utf8",
   );
   mkdirSync(join(root, "skills", "lint"), { recursive: true });

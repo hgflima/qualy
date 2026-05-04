@@ -29,13 +29,13 @@ import { EXIT_CODES } from "../../../src/lib/exit-codes.ts";
 /**
  * Build a synthetic qualy distribution rooted at `root` with the four
  * top-level payload directories (`skills/`, `commands/`, `agents/`, `cli/`)
- * plus a `package.json` whose `name === "qualy"`. The harness installer must
+ * plus a `package.json` whose `name === "@hgflima/qualy"`. The harness installer must
  * be able to point its `source` here without copying the real repo.
  */
 function makePayload(root: string, version = "0.1.0"): void {
   writeFileSync(
     join(root, "package.json"),
-    JSON.stringify({ name: "qualy", version }),
+    JSON.stringify({ name: "@hgflima/qualy", version }),
     "utf8",
   );
 

@@ -1,5 +1,5 @@
 /**
- * `npm view qualy version` wrapper used by `qualy update` (TASKS 2.3 + SPEC §3).
+ * `npm view @hgflima/qualy version` wrapper used by `qualy update` (TASKS 2.3 + SPEC §3).
  *
  * `fetchLatestVersion()` returns a discriminated result so the caller can map
  * each registry failure mode to a user-facing message without juggling errno
@@ -129,7 +129,7 @@ const defaultRunNpmView: RunNpmView = (input) =>
 
     let child: ReturnType<typeof spawn>;
     try {
-      child = spawn("npm", ["view", "qualy", "version"], {
+      child = spawn("npm", ["view", "@hgflima/qualy", "version"], {
         stdio: ["ignore", "pipe", "pipe"],
       });
     } catch (err) {

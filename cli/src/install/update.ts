@@ -262,7 +262,7 @@ function kindToMessage(r: RegistryFetchErr): string {
   }
   if (r.kind === "mirror") {
     return (
-      `registry returned no version for "qualy" — your registry may be a ` +
+      `registry returned no version for "@hgflima/qualy" — your registry may be a ` +
       `private mirror without this package: ${r.message}`
     );
   }

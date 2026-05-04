@@ -37,7 +37,7 @@ async function seedManifest(
     const fs = await import("node:fs");
     fs.writeFileSync(
       join(payload, "package.json"),
-      JSON.stringify({ name: "qualy", version }),
+      JSON.stringify({ name: "@hgflima/qualy", version }),
       "utf8",
     );
     fs.mkdirSync(join(payload, "skills", "lint"), { recursive: true });

@@ -26,7 +26,7 @@ describe("readPackageVersion", () => {
     try {
       writeFileSync(
         join(tmp, "package.json"),
-        JSON.stringify({ name: "qualy", version: "9.9.9" }),
+        JSON.stringify({ name: "@hgflima/qualy", version: "9.9.9" }),
       );
       const inner = join(tmp, "cli", "src", "install");
       mkdirSync(inner, { recursive: true });
@@ -43,7 +43,7 @@ describe("readPackageVersion", () => {
   it("throws an explicit error when no qualy root is reachable", () => {
     const tmp = mkdtempSync(join(tmpdir(), "qualy-version-norepo-"));
     try {
-      // No package.json with name "qualy" anywhere on the path to /.
+      // No package.json with name "@hgflima/qualy" anywhere on the path to /.
       expect(() => readPackageVersion(tmp)).toThrowError(
         /unable to locate qualy root package\.json/,
       );
@@ -55,7 +55,7 @@ describe("readPackageVersion", () => {
   it("throws when the qualy package.json lacks a version field", () => {
     const tmp = mkdtempSync(join(tmpdir(), "qualy-version-noversion-"));
     try {
-      writeFileSync(join(tmp, "package.json"), JSON.stringify({ name: "qualy" }));
+      writeFileSync(join(tmp, "package.json"), JSON.stringify({ name: "@hgflima/qualy" }));
       expect(() => readPackageVersion(tmp)).toThrowError(
         /missing a string "version" field/,
       );

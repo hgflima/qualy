@@ -2,8 +2,8 @@
  * Version primitives for the qualy harness installer.
  *
  * `readPackageVersion()` locates the root `package.json` (the one with
- * `"name": "qualy"`) by walking up from this module's directory. It must
- * skip the inner `cli/package.json` (whose name is `@qualy/cli`).
+ * `"name": "@hgflima/qualy"`) by walking up from this module's directory. It
+ * must skip the inner `cli/package.json` (whose name is `@qualy/cli`).
  *
  * `checkNodeVersion()` is the runtime pre-flight: every install/uninstall/
  * update path runs it before touching the filesystem so the user gets a
@@ -22,7 +22,7 @@ export type NodeVersionCheck =
 
 /**
  * Walks up from `startDir` until it finds the directory containing a
- * `package.json` whose `"name"` field equals `"qualy"`. Throws if the root is
+ * `package.json` whose `"name"` field equals `"@hgflima/qualy"`. Throws if the root is
  * not reachable. Used by the harness installer to locate the payload source
  * (`source = findQualyRoot()`) — every artifact under that root is what gets
  * copied to the target scope.
@@ -37,7 +37,7 @@ export function findQualyRoot(startDir?: string): string {
         const parsed = JSON.parse(readFileSync(candidate, "utf8")) as {
           name?: unknown;
         };
-        if (parsed.name === "qualy") return dir;
+        if (parsed.name === "@hgflima/qualy") return dir;
       } catch {
         // Ignore malformed package.json on the way up; keep walking.
       }
@@ -55,7 +55,7 @@ export function findQualyRoot(startDir?: string): string {
 
 /**
  * Walks up from `startDir` until it finds a `package.json` whose `"name"`
- * field equals `"qualy"`. Returns the `version` field. Throws if the root
+ * field equals `"@hgflima/qualy"`. Returns the `version` field. Throws if the root
  * is not reachable (no qualy package.json found before hitting `/`).
  *
  * `startDir` defaults to the directory of this module — exposed only so
