@@ -34,6 +34,7 @@ import { runInstallScripts } from "./commands/install/scripts.ts";
 import { runRecsApply } from "./commands/recs/apply.ts";
 import { runRecsBlastRadius } from "./commands/recs/blast-radius.ts";
 import { runRecsGenerate } from "./commands/recs/generate.ts";
+import { runRulesExplain } from "./commands/rules/explain.ts";
 import { runRulesList } from "./commands/rules/list.ts";
 import { runStatus } from "./commands/status.ts";
 import { runUninstall } from "./commands/uninstall.ts";
@@ -119,6 +120,7 @@ const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ["recs-apply", runRecsApply],
   ["recs-blast-radius", runRecsBlastRadius],
   ["recs-generate", runRecsGenerate],
+  ["rules-explain", runRulesExplain],
   ["rules-list", runRulesList],
   ["status", runStatus],
   ["uninstall", runUninstall],
