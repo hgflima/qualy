@@ -8,5 +8,4 @@ dist/
 .lint-audit/
 .lint-backup/
 .lint-manifest.json
-.ralph_stuck_tracker
-ralph.log
+/ralph
