@@ -1,9 +1,18 @@
-name: publish
+name: Publish
 
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'npm dist-tag (default: latest)'
+        required: false
+        default: 'latest'
+
+permissions:
+  contents: read
+  id-token: write
 
 concurrency:
   group: publish-${{ github.ref }}
@@ -11,18 +20,20 @@ concurrency:
 
 jobs:
   publish:
+    name: Build, test and publish to npm
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
+    environment: npm-publish
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: '22.6'
+          # Node 24 ships with npm >= 11.5.1, required for Trusted Publisher
+          # OIDC publishing. Node 22 ships with npm 10.x.
+          node-version: '24'
+          cache: npm
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
@@ -40,7 +51,16 @@ jobs:
       - name: E2E tests
         run: npm run test:e2e
 
-      - name: Publish to npm (dry-run)
-        run: npm publish --dry-run --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Verify package version matches release tag
+        if: github.event_name == 'release'
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAG_NAME="${GITHUB_REF_NAME#v}"
+          if [ "$PKG_VERSION" != "$TAG_NAME" ]; then
+            echo "::error::package.json version ($PKG_VERSION) does not match release tag ($TAG_NAME)"
+            exit 1
+          fi
+          echo "Version $PKG_VERSION matches tag v$TAG_NAME"
+
+      - name: Publish to npm with provenance
+        run: npm publish --provenance --access public --tag "${{ github.event.inputs.tag || 'latest' }}"
