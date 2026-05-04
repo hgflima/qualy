@@ -33,6 +33,7 @@ import { runInstallHook } from "./commands/install/hook.ts";
 import { runInstallHusky } from "./commands/install/husky.ts";
 import { runInstallOxlint } from "./commands/install/oxlint.ts";
 import { runInstallScripts } from "./commands/install/scripts.ts";
+import { runHarnessInstall } from "./install/install.ts";
 import { runRecsApply } from "./commands/recs/apply.ts";
 import { runRecsBlastRadius } from "./commands/recs/blast-radius.ts";
 import { runRecsGenerate } from "./commands/recs/generate.ts";
@@ -87,6 +88,7 @@ const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> =
   ["install-scripts", "Idempotently merge scripts into package.json"],
   ["install-coverage", "Configure vitest/jest coverage thresholds"],
   ["install-deps", "Install runtime deps via npm/pnpm/yarn/bun (lockfile-driven)"],
+  ["install", "Install the qualy harness payload into a target scope (.claude/)"],
   ["audit", "Run oxlint+oxfmt+quality-metrics, write .lint-audit/<ts>.json"],
   ["audit-latest", "Read the most recent .lint-audit/*.json"],
   ["recs-generate", "Deterministic heuristics → candidates[] (rationale_stub only)"],
@@ -125,6 +127,7 @@ const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ["install-husky", runInstallHusky],
   ["install-oxlint", runInstallOxlint],
   ["install-scripts", runInstallScripts],
+  ["install", runHarnessInstall],
   ["recs-apply", runRecsApply],
   ["recs-blast-radius", runRecsBlastRadius],
   ["recs-generate", runRecsGenerate],

@@ -1,0 +1,297 @@
+/**
+ * `qualy install` — copies the harness payload into a target scope and
+ * records every file in `.lint-manifest.json`.
+ *
+ * Pipeline (SPEC §3 + §4 + TASKS 2.1):
+ *   1. `checkNodeVersion()` → exit `MISSING_DEPENDENCY` (5) on miss.
+ *   2. `resolveScope(scope, cwd)` → exit `RECOVERABLE_ERROR` (1) on miss
+ *      (HOME unset, missing `.git`, traversal, `/`).
+ *   3. `readManifest(scopeRoot)` — if present, log "overwriting" (SPEC §6
+ *      "Sobrescrever sempre"; we do not prompt).
+ *   4. `findQualyRoot()` to locate the payload source, `copyPayload()` to
+ *      mirror it into the scope, gated by `--dry-run`.
+ *   5. For `--scope local`: `appendIgnoreLine(cwd, ".claude/")` so the
+ *      experiment does not leak into commits.
+ *   6. Build manifest = `{ ...copied, ...skipped }` (skipped files were
+ *      already byte-equal in the target — they belong in the index so
+ *      `qualy uninstall` reclaims them).
+ *
+ * Output (single canonical JSON to stdout, SPEC §6):
+ *   { ok, scope, version, target, copied, skipped, dry_run, manifest_overwritten,
+ *     gitignore: { action } }
+ *
+ * Why pass `source` as an option: tests need to point the installer at a
+ * synthetic payload tree without copying the real qualy repo. In production
+ * `source` defaults to `findQualyRoot()`.
+ */
+import type { Writable } from "node:stream";
+
+import { EXIT_CODES, type ExitCode } from "../lib/exit-codes.ts";
+import { logger, output } from "../lib/logger.ts";
+import { copyPayload, type CopyResult } from "./copy.ts";
+import { RecoverableError } from "./errors.ts";
+import { appendIgnoreLine, type IgnoreAction } from "./gitignore.ts";
+import {
+  type Manifest,
+  type ManifestEntry,
+  MANIFEST_VERSION,
+  readManifest,
+  writeManifest,
+} from "./manifest.ts";
+import { resolveScope, type Scope } from "./scope.ts";
+import {
+  checkNodeVersion,
+  findQualyRoot,
+  readPackageVersion,
+  REQUIRED_NODE_VERSION,
+} from "./version.ts";
+
+const HELP_TEXT = `qualy install [--scope user|project|local] [--cwd <path>] [--dry-run] [--yes]
+
+Copies the qualy harness (skills/lint, commands/, agents/, cli/) into a target
+scope and writes .lint-manifest.json so a future \`qualy uninstall\` can
+reverse it byte-for-byte.
+
+Scopes:
+  user      \${HOME}/.claude (per-user, shared across projects)
+  project   \${cwd}/.claude (committed; requires .git/)
+  local     \${cwd}/.claude (gitignored — installer adds .claude/ to .gitignore)
+
+Flags:
+  --scope <s>    Target scope (default: project).
+  --cwd <path>   cwd used for project|local scope resolution. Default: process.cwd().
+  --dry-run      Plan but write nothing.
+  --yes          Reserved for parity with \`update\`/\`uninstall\`. \`install\`
+                 already overwrites without prompting (SPEC §6).
+  --help, -h     Show this help.
+
+Exit codes: 0 ok, 1 recoverable error, 4 usage, 5 Node too old.
+`;
+
+export type InstallOptions = {
+  readonly scope: Scope;
+  readonly cwd: string;
+  readonly dryRun: boolean;
+  readonly yes: boolean;
+  /** Override the payload source (test seam). Defaults to `findQualyRoot()`. */
+  readonly source?: string;
+};
+
+export type InstallOk = {
+  readonly ok: true;
+  readonly scope: Scope;
+  readonly version: string;
+  readonly target: string;
+  readonly copied: number;
+  readonly skipped: number;
+  readonly dry_run: boolean;
+  readonly manifest_overwritten: boolean;
+  readonly gitignore: { readonly action: IgnoreAction | "skipped" };
+};
+
+export type InstallErr = {
+  readonly ok: false;
+  readonly error:
+    | "node_too_old"
+    | "scope_resolution"
+    | "payload_missing"
+    | "internal";
+  readonly reason: string;
+  readonly detail?: Readonly<Record<string, unknown>>;
+};
+
+export type InstallResult = InstallOk | InstallErr;
+
+export async function installHarness(
+  opts: InstallOptions,
+): Promise<InstallResult> {
+  const node = checkNodeVersion();
+  if (!node.ok) {
+    return {
+      ok: false,
+      error: "node_too_old",
+      reason: `Node ${node.found} is below required ${REQUIRED_NODE_VERSION}`,
+      detail: { found: node.found, required: node.required },
+    };
+  }
+
+  let resolved: { root: string; scope: Scope };
+  try {
+    resolved = resolveScope(opts.scope, opts.cwd);
+  } catch (err) {
+    if (err instanceof RecoverableError) {
+      return { ok: false, error: "scope_resolution", reason: err.message };
+    }
+    throw err;
+  }
+
+  let source: string;
+  let version: string;
+  try {
+    source = opts.source ?? findQualyRoot();
+    version = readPackageVersion(source);
+  } catch (err) {
+    return {
+      ok: false,
+      error: "payload_missing",
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  const prior = readManifest(resolved.root);
+  const manifestOverwritten = prior !== null;
+  if (manifestOverwritten) {
+    logger.warn("install_overwriting", {
+      target: resolved.root,
+      prior_scope: prior.scope,
+      prior_version: prior.harness_version,
+    });
+  }
+
+  let copyResult: CopyResult;
+  try {
+    copyResult = await copyPayload({
+      source,
+      target: resolved.root,
+      dryRun: opts.dryRun,
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: "internal",
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  let gitignoreAction: IgnoreAction | "skipped" = "skipped";
+  if (resolved.scope === "local" && !opts.dryRun) {
+    gitignoreAction = appendIgnoreLine(opts.cwd, ".claude/");
+  }
+
+  const entries: ManifestEntry[] = [...copyResult.copied, ...copyResult.skipped]
+    .map((e) => ({ path: e.rel, sha256: e.sha256, kind: e.kind }))
+    .toSorted((a, b) => a.path.localeCompare(b.path));
+
+  if (!opts.dryRun) {
+    const manifest: Manifest = {
+      version: MANIFEST_VERSION,
+      scope: resolved.scope,
+      harness_version: version,
+      installer: "npx",
+      installed_at: new Date().toISOString(),
+      entries,
+    };
+    writeManifest(resolved.root, manifest);
+  }
+
+  return {
+    ok: true,
+    scope: resolved.scope,
+    version,
+    target: resolved.root,
+    copied: copyResult.copied.length,
+    skipped: copyResult.skipped.length,
+    dry_run: opts.dryRun,
+    manifest_overwritten: manifestOverwritten,
+    gitignore: { action: gitignoreAction },
+  };
+}
+
+export type ParsedArgs = {
+  readonly scope: Scope;
+  readonly cwd: string;
+  readonly dryRun: boolean;
+  readonly yes: boolean;
+};
+
+export type ArgParseResult =
+  | { ok: true; value: ParsedArgs }
+  | { ok: false; error: "help" | string };
+
+export function parseInstallArgs(
+  argv: readonly string[],
+  defaultCwd: string,
+): ArgParseResult {
+  let scope: Scope = "project";
+  let cwd = defaultCwd;
+  let dryRun = false;
+  let yes = false;
+
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--scope") {
+      const value = argv[i + 1];
+      if (value !== "user" && value !== "project" && value !== "local") {
+        return {
+          ok: false,
+          error: `--scope must be one of user|project|local (got: ${String(value)})`,
+        };
+      }
+      scope = value;
+      i++;
+      continue;
+    }
+    if (arg === "--cwd") {
+      const value = argv[i + 1];
+      if (typeof value !== "string" || value.length === 0) {
+        return { ok: false, error: "missing value for --cwd" };
+      }
+      cwd = value;
+      i++;
+      continue;
+    }
+    if (arg === "--dry-run") {
+      dryRun = true;
+      continue;
+    }
+    if (arg === "--yes") {
+      yes = true;
+      continue;
+    }
+    if (arg === "--help" || arg === "-h") {
+      return { ok: false, error: "help" };
+    }
+    return { ok: false, error: `unknown flag: ${String(arg)}` };
+  }
+
+  return { ok: true, value: { scope, cwd, dryRun, yes } };
+}
+
+function errToExit(err: InstallErr["error"]): ExitCode {
+  if (err === "node_too_old") return EXIT_CODES.MISSING_DEPENDENCY;
+  if (err === "internal") return EXIT_CODES.INTERNAL_ERROR;
+  return EXIT_CODES.RECOVERABLE_ERROR;
+}
+
+export async function runHarnessInstall(
+  argv: readonly string[],
+  deps: { readonly stderr?: Writable } = {},
+): Promise<ExitCode> {
+  const stderr = deps.stderr ?? process.stderr;
+  const parsed = parseInstallArgs(argv, process.cwd());
+  if (!parsed.ok) {
+    if (parsed.error === "help") {
+      stderr.write(HELP_TEXT);
+      return EXIT_CODES.OK;
+    }
+    logger.error("usage_error", { command: "install", reason: parsed.error });
+    output({ ok: false, error: "usage_error", reason: parsed.error });
+    return EXIT_CODES.USAGE_ERROR;
+  }
+
+  const result = await installHarness(parsed.value);
+  output(result);
+  if (!result.ok) {
+    logger.error("install_failed", { error: result.error, reason: result.reason });
+    return errToExit(result.error);
+  }
+  logger.info("install_ok", {
+    scope: result.scope,
+    version: result.version,
+    target: result.target,
+    copied: result.copied,
+    skipped: result.skipped,
+    dry_run: result.dry_run,
+  });
+  return EXIT_CODES.OK;
+}

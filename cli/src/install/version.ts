@@ -21,28 +21,25 @@ export type NodeVersionCheck =
   | { ok: false; found: string; required: typeof REQUIRED_NODE_VERSION };
 
 /**
- * Walks up from `startDir` until it finds a `package.json` whose `"name"`
- * field equals `"qualy"`. Returns the `version` field. Throws if the root
- * is not reachable (no qualy package.json found before hitting `/`).
- *
- * `startDir` defaults to the directory of this module — exposed only so
- * tests can exercise the not-found path against a synthetic tmpdir.
+ * Walks up from `startDir` until it finds the directory containing a
+ * `package.json` whose `"name"` field equals `"qualy"`. Throws if the root is
+ * not reachable. Used by the harness installer to locate the payload source
+ * (`source = findQualyRoot()`) — every artifact under that root is what gets
+ * copied to the target scope.
  */
-export function readPackageVersion(startDir?: string): string {
+export function findQualyRoot(startDir?: string): string {
   const start = startDir ?? dirname(fileURLToPath(import.meta.url));
   let dir = resolve(start);
   while (true) {
     const candidate = join(dir, "package.json");
     if (existsSync(candidate)) {
-      const raw = readFileSync(candidate, "utf8");
-      const parsed = JSON.parse(raw) as { name?: unknown; version?: unknown };
-      if (parsed.name === "qualy") {
-        if (typeof parsed.version !== "string" || parsed.version.length === 0) {
-          throw new Error(
-            `qualy package.json at ${candidate} is missing a string "version" field`,
-          );
-        }
-        return parsed.version;
+      try {
+        const parsed = JSON.parse(readFileSync(candidate, "utf8")) as {
+          name?: unknown;
+        };
+        if (parsed.name === "qualy") return dir;
+      } catch {
+        // Ignore malformed package.json on the way up; keep walking.
       }
     }
     const parent = dirname(dir);
@@ -54,6 +51,28 @@ export function readPackageVersion(startDir?: string): string {
     }
     dir = parent;
   }
+}
+
+/**
+ * Walks up from `startDir` until it finds a `package.json` whose `"name"`
+ * field equals `"qualy"`. Returns the `version` field. Throws if the root
+ * is not reachable (no qualy package.json found before hitting `/`).
+ *
+ * `startDir` defaults to the directory of this module — exposed only so
+ * tests can exercise the not-found path against a synthetic tmpdir.
+ */
+export function readPackageVersion(startDir?: string): string {
+  const root = findQualyRoot(startDir);
+  const candidate = join(root, "package.json");
+  const parsed = JSON.parse(readFileSync(candidate, "utf8")) as {
+    version?: unknown;
+  };
+  if (typeof parsed.version !== "string" || parsed.version.length === 0) {
+    throw new Error(
+      `qualy package.json at ${candidate} is missing a string "version" field`,
+    );
+  }
+  return parsed.version;
 }
 
 /**
