@@ -103,5 +103,17 @@ describe("checkNodeVersion", () => {
   it("REQUIRED_NODE_VERSION is the literal pinned in the SPEC", () => {
     expect(REQUIRED_NODE_VERSION).toBe("22.6.0");
   });
+
+  it("throws when the version string lacks a MAJOR.MINOR.PATCH triple", () => {
+    expect(() => checkNodeVersion("22.6")).toThrowError(
+      /expected MAJOR\.MINOR\.PATCH/,
+    );
+  });
+
+  it("throws when a semver component is non-numeric", () => {
+    expect(() => checkNodeVersion("22.x.0")).toThrowError(
+      /non-numeric component/,
+    );
+  });
 });
 

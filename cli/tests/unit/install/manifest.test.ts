@@ -78,6 +78,16 @@ describe("manifest", () => {
     expect(() => readManifest(scopeRoot)).toThrow(/not valid JSON/);
   });
 
+  it("readManifest throws when the JSON payload is `null`", () => {
+    writeFileSync(manifestPath(scopeRoot), "null", "utf8");
+    expect(() => readManifest(scopeRoot)).toThrow(/not a JSON object/);
+  });
+
+  it("readManifest throws when the JSON payload is a primitive (string)", () => {
+    writeFileSync(manifestPath(scopeRoot), JSON.stringify("plain"), "utf8");
+    expect(() => readManifest(scopeRoot)).toThrow(/not a JSON object/);
+  });
+
   it("writeManifest surfaces the OS error when the target directory does not exist", () => {
     const missing = join(scopeRoot, "does", "not", "exist");
     expect(() => writeManifest(missing, sampleManifest())).toThrow(/ENOENT/);
