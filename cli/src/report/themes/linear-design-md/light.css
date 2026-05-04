@@ -1,0 +1,101 @@
+/*
+ * qualy report — linear-design-md theme · light + foundation
+ *
+ * Foundation tokens (font/space/radius/motion) are declared on :root and shared
+ * by every theme mode. Light palette is the default; dark.css overrides via
+ * [data-theme="dark"] or prefers-color-scheme. Any token added here must also
+ * appear in dark.css to satisfy the no-drift contract test.
+ */
+
+:root {
+  --font-family-sans: "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-family-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular,
+    Menlo, Consolas, monospace;
+
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 32px;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-loose: 1.75;
+
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  --motion-duration-instant: 0ms;
+  --motion-duration-fast: 120ms;
+  --motion-duration-base: 200ms;
+  --motion-duration-slow: 320ms;
+  --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-easing-emphasized: cubic-bezier(0.3, 0, 0, 1);
+}
+
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --color-bg-canvas: #ffffff;
+  --color-bg-surface: #fafbfc;
+  --color-bg-surface-elevated: #ffffff;
+  --color-fg-primary: #08090a;
+  --color-fg-secondary: #3c3e44;
+  --color-fg-muted: #62666d;
+  --color-border-default: #e6e8eb;
+  --color-border-muted: #f1f2f4;
+  --color-accent: #5e6ad2;
+  --color-accent-fg: #ffffff;
+  --color-accent-muted: #eef0fb;
+  --color-status-error: #c92a2a;
+  --color-status-warn: #b3791b;
+  --color-status-ok: #1f883d;
+  --color-status-info: #0969da;
+  --color-focus-ring: #5e6ad2;
+
+  --color-chart-1: #5e6ad2;
+  --color-chart-2: #1f883d;
+  --color-chart-3: #b3791b;
+  --color-chart-4: #c92a2a;
+  --color-chart-5: #0969da;
+  --color-chart-6: #7c3aed;
+  --color-chart-7: #0e7490;
+  --color-chart-8: #be185d;
+
+  --shadow-sm: 0 1px 2px rgba(8, 9, 10, 0.06);
+  --shadow-md: 0 4px 12px rgba(8, 9, 10, 0.08);
+  --shadow-lg: 0 12px 32px rgba(8, 9, 10, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-fast: 0ms;
+    --motion-duration-base: 0ms;
+    --motion-duration-slow: 0ms;
+  }
+}

@@ -103,7 +103,7 @@
 
 ## Priority 7: Fase 6 — Report visual
 
-- [ ] Criar `cli/src/report/themes/linear-design-md/{light.css,dark.css,tokens.json}` (why: SPEC §4 default theme)
+- [x] Criar `cli/src/report/themes/linear-design-md/{light.css,dark.css,tokens.json}` (why: SPEC §4 default theme). Tokens semânticos (color light/dark com mesmas chaves, chart 8-cor, font/space/radius/shadow/motion); `light.css` declara foundation + paleta `:root[data-theme="light"]` + `@media (prefers-reduced-motion)`; `dark.css` paleta `:root[data-theme="dark"]` + `@media (prefers-color-scheme: dark) :root:not([data-theme])`. Contract test em `cli/tests/unit/themes-linear-design-md.test.ts` trava: presença dos 3 arquivos, parity de chaves light/dark/chart/shadow, tokens semânticos canônicos, foundation só em light.css, regra de motion reduzido. 14 testes adicionados (1480 totais, todos passando).
 - [ ] Criar `cli/src/report/index.html` shell (why: SPEC §3 layout report)
 - [ ] Criar `cli/src/report/data-loader.ts` (lê `.lint-audit/<latest>.json` + git stats + coverage do runner) (why: SPEC §4 estado fonte)
 - [ ] Criar `cli/src/report/components/MetricCard.ts` (vanilla DOM ou Web Component) (why: SPEC §4 vanilla DOM)
