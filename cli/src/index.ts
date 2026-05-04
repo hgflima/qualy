@@ -41,6 +41,7 @@ import { runRulesRemove } from "./commands/rules/remove.ts";
 import { runStatus } from "./commands/status.ts";
 import { runUninstall } from "./commands/uninstall.ts";
 import { runReportData } from "./report/data-loader.ts";
+import { runReportExport } from "./commands/report/export.ts";
 import { runReportServe } from "./commands/report/serve.ts";
 import { EXIT_CODES, type ExitCode } from "./lib/exit-codes.ts";
 import { logger, output } from "./lib/logger.ts";
@@ -133,6 +134,7 @@ const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ["uninstall", runUninstall],
   ["report-data", runReportData],
   ["report-serve", runReportServe],
+  ["report-export", runReportExport],
 ]);
 
 const SUBCOMMANDS: ReadonlyMap<string, Subcommand> = new Map(
