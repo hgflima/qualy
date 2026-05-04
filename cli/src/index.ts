@@ -42,7 +42,7 @@ import { runRulesExplain } from "./commands/rules/explain.ts";
 import { runRulesList } from "./commands/rules/list.ts";
 import { runRulesRemove } from "./commands/rules/remove.ts";
 import { runStatus } from "./commands/status.ts";
-import { runUninstall } from "./commands/uninstall.ts";
+import { runLintUninstall } from "./commands/lint-uninstall.ts";
 import { runReportData } from "./report/data-loader.ts";
 import { runReportExport } from "./commands/report/export.ts";
 import { runReportServe } from "./commands/report/serve.ts";
@@ -71,7 +71,7 @@ function notImplemented(name: string): Handler {
 /**
  * Canonical subcommand list (PLAN §Contratos CLI). Order here drives `--help`
  * output, so keep it grouped by phase: detection → backup → install → audit →
- * recs → rules → status → report → uninstall.
+ * recs → rules → status → report → lint-uninstall.
  */
 const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> = [
   ["detect-stack", "Classify project stack as supported (TS/JS) or blocked"],
@@ -102,7 +102,7 @@ const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> =
   ["report-data", "Aggregate audit + history + coverage + git into report JSON"],
   ["report-serve", "Serve the visual report on 127.0.0.1 (long-running)"],
   ["report-export", "Write a self-contained HTML report"],
-  ["uninstall", "Remove every artifact tracked in .lint-manifest.json"],
+  ["lint-uninstall", "Remove every artifact tracked in .lint-manifest.json (lint-stack)"],
 ];
 
 /**
@@ -136,7 +136,7 @@ const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ["rules-list", runRulesList],
   ["rules-remove", runRulesRemove],
   ["status", runStatus],
-  ["uninstall", runUninstall],
+  ["lint-uninstall", runLintUninstall],
   ["report-data", runReportData],
   ["report-serve", runReportServe],
   ["report-export", runReportExport],

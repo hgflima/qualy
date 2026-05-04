@@ -48,7 +48,7 @@ Sequência por modo (não negociável — patch + teste, não prompt):
 
 1. **`migrate`** — `backup-create --files '<json>' --strict` → captura `dir` e `backed_up[]`. Em sucesso, devolve o caminho do snapshot ao parent para que `lint-installer` saiba que pode sobrescrever em segurança. NÃO deleta os configs originais — quem deleta é o `lint-installer` ao escrever os presets oxc no mesmo path (idempotência via `safeWriteFile`).
 2. **`restore`** — (i) `backup-list` para validar que `ts` existe; (ii) `backup-restore --ts <ts> [--files '<json>'] --strict` → captura `restored[]`. Manifest preservado via `skipManifest:true` (idempotente; `/lint:uninstall --keep-backup` continua funcionando).
-3. **`uninstall`** — `uninstall [--keep-backup]` → captura `removed[]`, `kept_backup`, `merged_kept[]`. NÃO toca entries `merged === true` ou `kind === "dep"`; o parent surface no follow-up.
+3. **`uninstall`** — `lint-uninstall [--keep-backup]` → captura `removed[]`, `kept_backup`, `merged_kept[]`. NÃO toca entries `merged === true` ou `kind === "dep"`; o parent surface no follow-up.
 
 Em qualquer falha (exit ≠ `0`), aborte o resto, capture stderr, emita sumário com `failed_at: <step>` e propague o exit code. Pós-condição em sucesso: `Read` de `<cwd>/.lint-manifest.json` para conferir o estado final (entries adicionadas em `migrate`, intactas em `restore`, deletadas/preservadas em `uninstall`) e devolver no sumário.
 
@@ -85,7 +85,7 @@ recommendation: <linha única — qualy status, /lint:rollback, /lint:setup, ou 
 
 - Smoke (`migrate`): rodar contra `cli/tests/fixtures/brownfield-eslint-prettier/` com `files=[".eslintrc.json",".prettierrc.json","package.json"]` deve criar `.lint-backup/<ts>/` com cópias byte-a-byte e adicionar entries `kind:"backup"` ao manifest, exit `0`.
 - Smoke (`restore`): após `migrate` + sobrescrita de configs no mesmo fixture, rodar `restore` com o `ts` retornado deve devolver `git diff` vazio nos arquivos do usuário (SPEC §7.2 acceptance), entries `kind:"backup"` permanecem.
-- Smoke (`uninstall`): após `/lint:setup` no mesmo fixture, rodar `uninstall` (sem `--keep-backup`) deve apagar tudo qualy-owned + snapshots; com `--keep-backup`, snapshots permanecem para `/lint:rollback` posterior.
+- Smoke (`uninstall`): após `/lint:setup` no mesmo fixture, rodar `lint-uninstall` (sem `--keep-backup`) deve apagar tudo qualy-owned + snapshots; com `--keep-backup`, snapshots permanecem para `/lint:rollback` posterior.
 - Sumário sempre ≤ 30 linhas (SPEC §4 line 303). Testes de contrato no harness validam o budget e a ordem dos modos.
 
 ## Referências

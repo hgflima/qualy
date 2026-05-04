@@ -4,7 +4,7 @@
  *
  * `lint-migrator` is the Phase 3 wrapper subagent that drives the four
  * backup/uninstall CLI subcommands (`backup-create`, `backup-list`,
- * `backup-restore`, `uninstall`) for three discriminated modes
+ * `backup-restore`, `lint-uninstall`) for three discriminated modes
  * (`migrate | restore | uninstall`). SPEC §4 line 296 caps the file at 150
  * lines; SPEC §4 line 295 fixes the section list; PLAN §Resolução do CLI
  * fixes the `QUALY_CLI=` preamble (defined once in SKILL.md and reused
@@ -159,7 +159,7 @@ describe("agents/lint-migrator.md — CLI subcommand coverage (PLAN §Fase 3)", 
     "backup-create",
     "backup-list",
     "backup-restore",
-    "uninstall",
+    "lint-uninstall",
   ] as const;
 
   for (const cmd of SUBCOMMANDS) {

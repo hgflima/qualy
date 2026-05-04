@@ -145,10 +145,10 @@ describe("commands/lint/uninstall.md — Resolução do CLI preamble (PLAN §190
 
 describe("commands/lint/uninstall.md — CLI subcommand coverage (Fase 3)", () => {
   // The uninstall flow MUST consult three CLI subcommands (read manifest,
-  // list backups, run uninstall) plus link to /lint:rollback for restore.
+  // list backups, run lint-uninstall) plus link to /lint:rollback for restore.
   const SUBCOMMANDS = [
     "backup-list",
-    "uninstall",
+    "lint-uninstall",
     "git-clean-check",
   ] as const;
 

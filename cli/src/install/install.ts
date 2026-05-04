@@ -13,8 +13,8 @@
  *   5. For `--scope local`: `appendIgnoreLine(cwd, ".claude/")` so the
  *      experiment does not leak into commits.
  *   6. Build manifest = `{ ...copied, ...skipped }` (skipped files were
- *      already byte-equal in the target — they belong in the index so
- *      `qualy uninstall` reclaims them).
+ *      already byte-equal in the target — they belong in the index so the
+ *      future harness uninstaller (Task 2.2b) reclaims them).
  *
  * Output (single canonical JSON to stdout, SPEC §6):
  *   { ok, scope, version, target, copied, skipped, dry_run, manifest_overwritten,
@@ -49,8 +49,8 @@ import {
 const HELP_TEXT = `qualy install [--scope user|project|local] [--cwd <path>] [--dry-run] [--yes]
 
 Copies the qualy harness (skills/lint, commands/, agents/, cli/) into a target
-scope and writes .lint-manifest.json so a future \`qualy uninstall\` can
-reverse it byte-for-byte.
+scope and writes .lint-manifest.json so the harness uninstaller can reverse
+it byte-for-byte (Task 2.2b).
 
 Scopes:
   user      \${HOME}/.claude (per-user, shared across projects)

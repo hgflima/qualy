@@ -1,5 +1,9 @@
 /**
- * `uninstall` — remove every artifact tracked in `.lint-manifest.json`.
+ * `lint-uninstall` — remove every artifact tracked in `.lint-manifest.json`.
+ *
+ * Renamed from `uninstall` to free the bare name for the harness uninstaller
+ * (PLAN §D1 / Task 2.2b). Semantics unchanged: drives `/lint:uninstall`,
+ * reading `<cwd>/.lint-manifest.json` produced by `/lint:setup`.
  *
  * SPEC §2 `/lint:uninstall`: "Remove tudo que `/lint:setup` instalou (linter,
  * formatter, hooks, coverage, report)." PLAN §Contratos CLI: input
@@ -57,34 +61,34 @@ import {
 import { stringifyPretty } from "../lib/json.ts";
 import { logger, output } from "../lib/logger.ts";
 
-export interface UninstallOptions {
+export interface LintUninstallOptions {
   readonly cwd: string;
   /** Preserve `kind:"backup"` files (and their manifest entries). */
   readonly keepBackup?: boolean;
 }
 
-export interface UninstallMergedKept {
+export interface LintUninstallMergedKept {
   readonly path: string;
   readonly kind: ManifestEntryKind;
 }
 
-export interface UninstallOk {
+export interface LintUninstallOk {
   readonly ok: true;
   readonly cwd: string;
   readonly removed: readonly string[];
   readonly kept_backup: boolean;
-  readonly merged_kept: readonly UninstallMergedKept[];
+  readonly merged_kept: readonly LintUninstallMergedKept[];
 }
 
-export interface UninstallErr {
+export interface LintUninstallErr {
   readonly ok: false;
   readonly error: string;
   readonly reason?: string;
 }
 
-export type UninstallResult = UninstallOk | UninstallErr;
+export type LintUninstallResult = LintUninstallOk | LintUninstallErr;
 
-export interface UninstallDeps {
+export interface LintUninstallDeps {
   readonly safeIO?: SafeIO;
 }
 
@@ -104,10 +108,10 @@ function isOwnedFile(entry: ManifestEntry): boolean {
   return true;
 }
 
-export function uninstall(
-  opts: UninstallOptions,
-  deps: UninstallDeps = {},
-): UninstallResult {
+export function lintUninstall(
+  opts: LintUninstallOptions,
+  deps: LintUninstallDeps = {},
+): LintUninstallResult {
   const safeIO = deps.safeIO ?? {};
   const existsFn = safeIO.existsFn ?? defaultExists;
   const removeFn = safeIO.removeFn ?? defaultRemove;
@@ -120,7 +124,7 @@ export function uninstall(
 
   const keepBackup = opts.keepBackup ?? false;
   const removed: string[] = [];
-  const mergedKept: UninstallMergedKept[] = [];
+  const mergedKept: LintUninstallMergedKept[] = [];
   const remaining: ManifestEntry[] = [];
 
   for (const entry of manifest.entries) {
@@ -218,7 +222,7 @@ export type ArgParseResult =
   | { ok: true; value: ParsedArgs }
   | { ok: false; error: string };
 
-export function parseUninstallArgs(
+export function parseLintUninstallArgs(
   argv: readonly string[],
   defaultCwd: string,
 ): ArgParseResult {
@@ -247,16 +251,18 @@ export function parseUninstallArgs(
   return { ok: true, value: { cwd, keepBackup } };
 }
 
-export function runUninstall(argv: readonly string[]): ExitCode {
-  const parsed = parseUninstallArgs(argv, process.cwd());
+export function runLintUninstall(argv: readonly string[]): ExitCode {
+  const parsed = parseLintUninstallArgs(argv, process.cwd());
   if (!parsed.ok) {
     if (parsed.error === "help") {
       process.stderr.write(
-        "qualy uninstall [--cwd <path>] [--keep-backup]\n" +
+        "qualy lint-uninstall [--cwd <path>] [--keep-backup]\n" +
           "\n" +
-          "Removes every artifact tracked in `.lint-manifest.json`. By default,\n" +
-          "snapshots under `.lint-backup/` are also deleted; pass --keep-backup to\n" +
-          "preserve them (their manifest entries are preserved too).\n" +
+          "Removes every artifact tracked in `.lint-manifest.json` (the lint-stack\n" +
+          "manifest written by `/lint:setup` — distinct from the harness manifest\n" +
+          "managed by `qualy install` and the harness uninstaller). By default,\n" +
+          "snapshots under `.lint-backup/` are also deleted; pass --keep-backup\n" +
+          "to preserve them (their manifest entries are preserved too).\n" +
           "Merged/virtual entries (settings, scripts, coverage, deps) are NOT\n" +
           "deleted by this command — they're surfaced in `merged_kept` for the\n" +
           "harness to clean up via the package manager / surgical edits.\n" +
@@ -264,14 +270,14 @@ export function runUninstall(argv: readonly string[]): ExitCode {
       );
       return EXIT_CODES.OK;
     }
-    logger.error("usage_error", { command: "uninstall", reason: parsed.error });
+    logger.error("usage_error", { command: "lint-uninstall", reason: parsed.error });
     output({ ok: false, error: "usage_error", reason: parsed.error });
     return EXIT_CODES.USAGE_ERROR;
   }
 
-  const result = uninstall(parsed.value);
+  const result = lintUninstall(parsed.value);
   if (!result.ok) {
-    logger.error("uninstall_failed", { reason: result.reason ?? result.error });
+    logger.error("lint_uninstall_failed", { reason: result.reason ?? result.error });
     output(result);
     if (result.error === "path_invalid") {
       return EXIT_CODES.USAGE_ERROR;
@@ -280,7 +286,7 @@ export function runUninstall(argv: readonly string[]): ExitCode {
   }
 
   output(result);
-  logger.info("uninstall_ok", {
+  logger.info("lint_uninstall_ok", {
     removed: result.removed.length,
     kept_backup: result.kept_backup,
     merged_kept: result.merged_kept.length,

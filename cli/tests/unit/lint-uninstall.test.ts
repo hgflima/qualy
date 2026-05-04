@@ -1,5 +1,5 @@
 /**
- * Contract tests for `uninstall` (IMPLEMENTATION_PLAN.md Phase 3).
+ * Contract tests for `lint-uninstall` (IMPLEMENTATION_PLAN.md Phase 3).
  *
  * What is locked:
  *   - Manifest is the source of truth: only entries listed there are touched.
@@ -19,9 +19,9 @@ import { sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
-  parseUninstallArgs,
-  uninstall,
-} from "../../src/commands/uninstall.ts";
+  lintUninstall,
+  parseLintUninstallArgs,
+} from "../../src/commands/lint-uninstall.ts";
 import {
   type Manifest,
   MANIFEST_FILENAME,
@@ -72,7 +72,7 @@ function seedFile(io: { files: Map<string, string> }, rel: string, content: stri
 
 const ISO = "2026-05-03T12:00:00.000Z";
 
-describe("uninstall — happy path", () => {
+describe("lint-uninstall — happy path", () => {
   it("deletes owned files and removes the manifest when nothing remains", () => {
     const io = memoryIO();
     seedFile(io, "oxlint.fast.json", "{}");
@@ -84,7 +84,7 @@ describe("uninstall — happy path", () => {
       io,
     );
 
-    const r = uninstall({ cwd: ROOT }, { safeIO: io });
+    const r = lintUninstall({ cwd: ROOT }, { safeIO: io });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.removed.sort()).toEqual([
@@ -112,7 +112,7 @@ describe("uninstall — happy path", () => {
       }),
     );
 
-    const r = uninstall({ cwd: ROOT }, { safeIO: io });
+    const r = lintUninstall({ cwd: ROOT }, { safeIO: io });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.removed).toEqual([]);
@@ -137,7 +137,7 @@ describe("uninstall — happy path", () => {
       recordEntry(ROOT, { path, kind, created_at: ISO }, io);
     }
 
-    const r = uninstall({ cwd: ROOT }, { safeIO: io });
+    const r = lintUninstall({ cwd: ROOT }, { safeIO: io });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.removed.sort()).toEqual(owned.map(([p]) => p).sort());
@@ -152,7 +152,7 @@ describe("uninstall — happy path", () => {
     recordEntry(ROOT, { path: "oxlint.fast.json", kind: "preset", created_at: ISO }, io);
     // Note: no seedFile — the file is missing on disk.
 
-    const r = uninstall({ cwd: ROOT }, { safeIO: io });
+    const r = lintUninstall({ cwd: ROOT }, { safeIO: io });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.removed).toEqual(["oxlint.fast.json"]);
@@ -160,7 +160,7 @@ describe("uninstall — happy path", () => {
   });
 });
 
-describe("uninstall — backup handling", () => {
+describe("lint-uninstall — backup handling", () => {
   it("deletes backup files by default", () => {
     const io = memoryIO();
     seedFile(io, ".lint-backup/ts1/.eslintrc.json", '{"a":1}');
@@ -176,7 +176,7 @@ describe("uninstall — backup handling", () => {
       io,
     );
 
-    const r = uninstall({ cwd: ROOT }, { safeIO: io });
+    const r = lintUninstall({ cwd: ROOT }, { safeIO: io });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.removed.sort()).toEqual([
@@ -199,7 +199,7 @@ describe("uninstall — backup handling", () => {
       io,
     );
 
-    const r = uninstall({ cwd: ROOT, keepBackup: true }, { safeIO: io });
+    const r = lintUninstall({ cwd: ROOT, keepBackup: true }, { safeIO: io });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.removed).toEqual(["oxlint.fast.json"]);
@@ -220,7 +220,7 @@ describe("uninstall — backup handling", () => {
     seedFile(io, "oxlint.fast.json", "{}");
     recordEntry(ROOT, { path: "oxlint.fast.json", kind: "preset", created_at: ISO }, io);
 
-    const r = uninstall({ cwd: ROOT, keepBackup: true }, { safeIO: io });
+    const r = lintUninstall({ cwd: ROOT, keepBackup: true }, { safeIO: io });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.kept_backup).toBe(false);
@@ -228,7 +228,7 @@ describe("uninstall — backup handling", () => {
   });
 });
 
-describe("uninstall — merged / dep entries", () => {
+describe("lint-uninstall — merged / dep entries", () => {
   it("preserves merged entries (settings, scripts, coverage) and surfaces them in merged_kept", () => {
     const io = memoryIO();
     seedFile(io, "oxlint.fast.json", "{}");
@@ -261,7 +261,7 @@ describe("uninstall — merged / dep entries", () => {
       io,
     );
 
-    const r = uninstall({ cwd: ROOT }, { safeIO: io });
+    const r = lintUninstall({ cwd: ROOT }, { safeIO: io });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.removed).toEqual(["oxlint.fast.json"]);
@@ -311,7 +311,7 @@ describe("uninstall — merged / dep entries", () => {
       io,
     );
 
-    const r = uninstall({ cwd: ROOT }, { safeIO: io });
+    const r = lintUninstall({ cwd: ROOT }, { safeIO: io });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.removed).toEqual(["oxlint.fast.json"]);
@@ -353,7 +353,7 @@ describe("uninstall — merged / dep entries", () => {
       io,
     );
 
-    const r = uninstall({ cwd: ROOT, keepBackup: true }, { safeIO: io });
+    const r = lintUninstall({ cwd: ROOT, keepBackup: true }, { safeIO: io });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.removed).toEqual(["oxlint.fast.json"]);
@@ -373,10 +373,10 @@ describe("uninstall — merged / dep entries", () => {
   });
 });
 
-describe("uninstall — error paths", () => {
+describe("lint-uninstall — error paths", () => {
   it("returns manifest_missing when the manifest is absent", () => {
     const io = memoryIO();
-    const r = uninstall({ cwd: ROOT }, { safeIO: io });
+    const r = lintUninstall({ cwd: ROOT }, { safeIO: io });
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error).toBe("manifest_missing");
@@ -390,7 +390,7 @@ describe("uninstall — error paths", () => {
       throw new Error("EACCES");
     };
 
-    const r = uninstall({ cwd: ROOT }, { safeIO: io });
+    const r = lintUninstall({ cwd: ROOT }, { safeIO: io });
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error).toBe("remove_failed");
@@ -409,7 +409,7 @@ describe("uninstall — error paths", () => {
       throw new Error("EBUSY");
     };
 
-    const r = uninstall({ cwd: ROOT }, { safeIO: io });
+    const r = lintUninstall({ cwd: ROOT }, { safeIO: io });
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error).toBe("remove_failed");
@@ -417,56 +417,56 @@ describe("uninstall — error paths", () => {
   });
 });
 
-describe("parseUninstallArgs", () => {
+describe("parseLintUninstallArgs", () => {
   it("returns defaults when called with no args", () => {
-    const r = parseUninstallArgs([], "/wd");
+    const r = parseLintUninstallArgs([], "/wd");
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.value).toEqual({ cwd: "/wd", keepBackup: false });
   });
 
   it("parses --keep-backup", () => {
-    const r = parseUninstallArgs(["--keep-backup"], "/wd");
+    const r = parseLintUninstallArgs(["--keep-backup"], "/wd");
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.value.keepBackup).toBe(true);
   });
 
   it("parses --cwd", () => {
-    const r = parseUninstallArgs(["--cwd", "/proj"], "/wd");
+    const r = parseLintUninstallArgs(["--cwd", "/proj"], "/wd");
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.value.cwd).toBe("/proj");
   });
 
   it("parses both --cwd and --keep-backup in either order", () => {
-    const a = parseUninstallArgs(["--cwd", "/proj", "--keep-backup"], "/wd");
+    const a = parseLintUninstallArgs(["--cwd", "/proj", "--keep-backup"], "/wd");
     expect(a.ok).toBe(true);
     if (!a.ok) return;
     expect(a.value).toEqual({ cwd: "/proj", keepBackup: true });
 
-    const b = parseUninstallArgs(["--keep-backup", "--cwd", "/proj"], "/wd");
+    const b = parseLintUninstallArgs(["--keep-backup", "--cwd", "/proj"], "/wd");
     expect(b.ok).toBe(true);
     if (!b.ok) return;
     expect(b.value).toEqual({ cwd: "/proj", keepBackup: true });
   });
 
   it("rejects missing value for --cwd", () => {
-    const r = parseUninstallArgs(["--cwd"], "/wd");
+    const r = parseLintUninstallArgs(["--cwd"], "/wd");
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error).toContain("missing value for --cwd");
   });
 
   it("rejects unknown flag", () => {
-    const r = parseUninstallArgs(["--zonk"], "/wd");
+    const r = parseLintUninstallArgs(["--zonk"], "/wd");
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error).toContain("unknown flag");
   });
 
   it("returns help sentinel for --help / -h", () => {
-    expect(parseUninstallArgs(["--help"], "/wd")).toEqual({ ok: false, error: "help" });
-    expect(parseUninstallArgs(["-h"], "/wd")).toEqual({ ok: false, error: "help" });
+    expect(parseLintUninstallArgs(["--help"], "/wd")).toEqual({ ok: false, error: "help" });
+    expect(parseLintUninstallArgs(["-h"], "/wd")).toEqual({ ok: false, error: "help" });
   });
 });
