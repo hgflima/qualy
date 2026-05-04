@@ -84,11 +84,11 @@ export const MIME_TYPES: Readonly<Record<RouteKind, string>> = {
   vendorTreemap: "text/javascript; charset=utf-8",
 };
 
-const REPORT_ROOT = dirname(fileURLToPath(import.meta.url));
-const INDEX_HTML_PATH = join(REPORT_ROOT, "index.html");
-const APP_ENTRY_PATH = join(REPORT_ROOT, "app.ts");
-const THEME_LIGHT_PATH = join(REPORT_ROOT, "themes/linear-design-md/light.css");
-const THEME_DARK_PATH = join(REPORT_ROOT, "themes/linear-design-md/dark.css");
+export const REPORT_ROOT = dirname(fileURLToPath(import.meta.url));
+export const INDEX_HTML_PATH = join(REPORT_ROOT, "index.html");
+export const APP_ENTRY_PATH = join(REPORT_ROOT, "app.ts");
+export const THEME_LIGHT_PATH = join(REPORT_ROOT, "themes/linear-design-md/light.css");
+export const THEME_DARK_PATH = join(REPORT_ROOT, "themes/linear-design-md/dark.css");
 
 // Vendor chart libs are resolved by walking up the directory tree looking for
 // `node_modules/<pkg>/<subpath>`. This works with npm workspaces (hoisted to
