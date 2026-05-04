@@ -15,6 +15,8 @@
  *   - Stdout: at most one canonical JSON document per invocation (via output()).
  *   - Stderr: NDJSON via logger plus the human-readable `--help` text.
  */
+import { realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { runAudit } from "./commands/audit.ts";
 import { runAuditLatest } from "./commands/audit-latest.ts";
 import { runBackupCreate } from "./commands/backup/create.ts";
@@ -216,7 +218,15 @@ export function listSubcommands(): readonly Subcommand[] {
   return Array.from(SUBCOMMANDS.values());
 }
 
-const isMain = import.meta.url === `file://${process.argv[1]}`;
+const isMain = (() => {
+  const argv1 = process.argv[1];
+  if (!argv1) return false;
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(argv1)).href;
+  } catch {
+    return false;
+  }
+})();
 if (isMain) {
   run(process.argv.slice(2))
     .then((code) => {

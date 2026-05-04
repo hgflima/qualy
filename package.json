@@ -12,9 +12,18 @@
   ],
   "scripts": {
     "typecheck": "npm run typecheck --workspace @qualy/cli",
-    "lint": "echo \"[qualy] lint: not yet wired (oxlint installed in a later phase)\" && exit 0",
+    "lint": "oxlint --config oxlint.fast.json .",
     "test": "vitest run cli/tests/unit",
     "test:e2e": "vitest run cli/tests/e2e",
-    "build": "echo \"[qualy] build: noop — Node 22.6+ executes .ts directly via --experimental-strip-types\" && exit 0"
+    "build": "echo \"[qualy] build: noop — Node 22.6+ executes .ts directly via --experimental-strip-types\" && exit 0",
+    "lint:deep": "oxlint --config oxlint.deep.json .",
+    "format": "oxfmt --write .",
+    "coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.47.0",
+    "oxlint": "^1.62.0",
+    "quality-metrics": "^0.1.1",
+    "ts-morph": "^28.0.0"
   }
 }

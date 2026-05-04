@@ -30,5 +30,15 @@ export default defineConfig({
     passWithNoTests: false,
     clearMocks: true,
     restoreMocks: true,
-  },
+      coverage: {
+          provider: "v8",
+          reporter: ["text", "json", "json-summary", "html"],
+          thresholds: {
+              lines: 70,
+              functions: 70,
+              branches: 60,
+              statements: 70
+        }
+    }
+},
 });
