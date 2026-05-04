@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="referrer" content="no-referrer" />
+    <title>qualy · quality report</title>
+
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("qualy.theme");
+          var prefersDark =
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var theme =
+            stored === "light" || stored === "dark"
+              ? stored
+              : prefersDark
+                ? "dark"
+                : "light";
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (e) {
+          // localStorage unavailable (sandboxed iframe, file://, etc.) —
+          // fall back to the data-theme attribute already on <html>.
+        }
+      })();
+    </script>
+
+    <link rel="stylesheet" href="./themes/linear-design-md/light.css" />
+    <link rel="stylesheet" href="./themes/linear-design-md/dark.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header role="banner">
+      <h1>qualy · quality report</h1>
+      <button
+        id="theme-toggle"
+        type="button"
+        aria-label="Toggle light and dark theme"
+        aria-pressed="false"
+      >
+        Toggle theme
+      </button>
+    </header>
+
+    <main id="main" role="main">
+      <section id="metrics" aria-labelledby="metrics-heading">
+        <h2 id="metrics-heading">Metric cards</h2>
+        <div id="metric-cards" data-mount="metric-cards"></div>
+      </section>
+
+      <section id="trend" aria-labelledby="trend-heading">
+        <h2 id="trend-heading">Trend</h2>
+        <div
+          id="chart-line"
+          data-mount="chart-line"
+          role="img"
+          aria-label="Line chart of audit trend over time"
+        ></div>
+      </section>
+
+      <section id="files" aria-labelledby="files-heading">
+        <h2 id="files-heading">Violations by file</h2>
+        <div
+          id="chart-treemap"
+          data-mount="chart-treemap"
+          role="img"
+          aria-label="Treemap of violations by file"
+        ></div>
+      </section>
+
+      <section id="violations" aria-labelledby="violations-heading">
+        <h2 id="violations-heading">Top violations</h2>
+        <div id="violations-table" data-mount="violations-table"></div>
+      </section>
+
+      <div id="status" role="status" aria-live="polite"></div>
+    </main>
+
+    <footer role="contentinfo">
+      <small>qualy · linear-design-md</small>
+    </footer>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
