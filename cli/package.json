@@ -17,7 +17,8 @@
     "chart.js": "^4.4.0",
     "chartjs-chart-treemap": "^3.1.0",
     "esbuild": "^0.24.0",
-    "ts-morph": "^24.0.0"
+    "ts-morph": "^24.0.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
