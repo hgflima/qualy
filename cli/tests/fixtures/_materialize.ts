@@ -92,7 +92,10 @@ export function materializeFixture(
   try {
     cpSync(sourceDir, dir, {
       recursive: true,
-      filter: (src) => basename(src) !== "EXPECTED.md",
+      filter: (src) => {
+        const name = basename(src);
+        return name !== "EXPECTED.md" && name !== "EXPECTED.json";
+      },
     });
   } catch (err) {
     safeCleanup(dir, tmpRoot);

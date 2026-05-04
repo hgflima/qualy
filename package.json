@@ -13,8 +13,8 @@
   "scripts": {
     "typecheck": "npm run typecheck --workspace @qualy/cli",
     "lint": "echo \"[qualy] lint: not yet wired (oxlint installed in a later phase)\" && exit 0",
-    "test": "vitest run",
-    "test:e2e": "echo \"[qualy] test:e2e: not yet wired (added in Fase 7)\" && exit 0",
+    "test": "vitest run cli/tests/unit",
+    "test:e2e": "vitest run cli/tests/e2e",
     "build": "echo \"[qualy] build: noop — Node 22.6+ executes .ts directly via --experimental-strip-types\" && exit 0"
   }
 }

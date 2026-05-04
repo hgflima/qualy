@@ -1,0 +1,63 @@
+{
+  "detect-stack": {
+    "exitCode": 0,
+    "stdout": {
+      "ok": true,
+      "cwd": "<cwd>",
+      "supported": true,
+      "signals": {
+        "tsFiles": 5,
+        "tsxFiles": 0,
+        "jsFiles": 0,
+        "jsxFiles": 0,
+        "hasPackageJson": true,
+        "vueFiles": 0,
+        "svelteFiles": 0
+      },
+      "blockers": [],
+      "supportedLanguages": [
+        "ts"
+      ]
+    }
+  },
+  "detect-existing-linter": {
+    "exitCode": 0,
+    "stdout": {
+      "linters": [],
+      "formatters": []
+    }
+  },
+  "detect-test-runner": {
+    "exitCode": 0,
+    "stdout": {
+      "runner": "none",
+      "candidates": {
+        "vitest": {
+          "configs": [],
+          "pkg_dep": false,
+          "thresholds": null,
+          "thresholds_source": null
+        },
+        "jest": {
+          "configs": [],
+          "pkg_dep": false,
+          "thresholds": null,
+          "thresholds_source": null
+        }
+      },
+      "coverage": {
+        "configured": false,
+        "current_thresholds": null,
+        "current_values": null,
+        "source": null
+      }
+    }
+  },
+  "git-clean-check": {
+    "exitCode": 0,
+    "stdout": {
+      "clean": true,
+      "dirty_files": []
+    }
+  }
+}

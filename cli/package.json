@@ -10,8 +10,8 @@
   "main": "src/index.ts",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "echo \"[qualy/cli] test: not yet wired (vitest config + tests added in Fase 1)\" && exit 0",
-    "test:e2e": "echo \"[qualy/cli] test:e2e: not yet wired (added in Fase 7)\" && exit 0"
+    "test": "npm test --prefix ..",
+    "test:e2e": "npm run test:e2e --prefix .."
   },
   "dependencies": {
     "chart.js": "^4.4.0",

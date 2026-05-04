@@ -34,11 +34,12 @@ describe("materializeFixture", () => {
     expect(statSync(join(fx.dir, "src")).isDirectory()).toBe(true);
   });
 
-  it("filters out EXPECTED.md when copying", () => {
+  it("filters out EXPECTED.md and EXPECTED.json when copying", () => {
     const fx = materializeFixture("greenfield-ts");
     cleanups.push(fx.cleanup);
 
     expect(existsSync(join(fx.dir, "EXPECTED.md"))).toBe(false);
+    expect(existsSync(join(fx.dir, "EXPECTED.json"))).toBe(false);
   });
 
   it("preserves all source files of the fixture verbatim", () => {

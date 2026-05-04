@@ -1,0 +1,76 @@
+{
+  "detect-stack": {
+    "exitCode": 0,
+    "stdout": {
+      "ok": true,
+      "cwd": "<cwd>",
+      "supported": true,
+      "signals": {
+        "tsFiles": 4,
+        "tsxFiles": 0,
+        "jsFiles": 1,
+        "jsxFiles": 0,
+        "hasPackageJson": true,
+        "vueFiles": 0,
+        "svelteFiles": 0
+      },
+      "blockers": [],
+      "supportedLanguages": [
+        "ts",
+        "js"
+      ]
+    }
+  },
+  "detect-existing-linter": {
+    "exitCode": 0,
+    "stdout": {
+      "linters": [],
+      "formatters": []
+    }
+  },
+  "detect-test-runner": {
+    "exitCode": 0,
+    "stdout": {
+      "runner": "jest",
+      "candidates": {
+        "vitest": {
+          "configs": [],
+          "pkg_dep": false,
+          "thresholds": null,
+          "thresholds_source": null
+        },
+        "jest": {
+          "configs": [
+            "jest.config.js"
+          ],
+          "pkg_dep": true,
+          "thresholds": {
+            "lines": 60,
+            "functions": null,
+            "branches": null,
+            "statements": null
+          },
+          "thresholds_source": "jest.config.js"
+        }
+      },
+      "coverage": {
+        "configured": true,
+        "current_thresholds": {
+          "lines": 60,
+          "functions": null,
+          "branches": null,
+          "statements": null
+        },
+        "current_values": null,
+        "source": "jest.config.js"
+      }
+    }
+  },
+  "git-clean-check": {
+    "exitCode": 0,
+    "stdout": {
+      "clean": true,
+      "dirty_files": []
+    }
+  }
+}
