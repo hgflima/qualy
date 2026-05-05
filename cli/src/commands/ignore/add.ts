@@ -79,6 +79,12 @@ import {
 import { dirtyFiles } from "../../lib/git.ts";
 import { compileToBothPresets } from "../../lib/ignore-compile.ts";
 import {
+  applyImportToPresets,
+  importBrownfieldIgnores,
+  type ImportedPattern,
+  IMPORT_REASON,
+} from "../../lib/ignore-import.ts";
+import {
   type IgnoreManifest,
   loadIgnoreManifest,
   saveIgnoreManifest,
@@ -116,6 +122,10 @@ export interface IgnoreAddOk {
   readonly expires: string | null;
   readonly files_changed: readonly string[];
   readonly decision: { readonly path: string; readonly appended: boolean };
+  /** Brownfield patterns imported on the first mutation (T3.4). Empty on
+   *  greenfield manifests, on subsequent mutations, and when neither preset
+   *  has user-authored `ignorePatterns[]` outside the qualy markers. */
+  readonly imported: readonly ImportedPattern[];
   readonly exitCode: ExitCode;
 }
 
@@ -294,6 +304,34 @@ function formatIgnoreDecision(inputs: DecisionInputs): string {
   });
 }
 
+interface ImportDecisionInputs {
+  readonly imported: readonly ImportedPattern[];
+  readonly author: string;
+  readonly now: Date;
+}
+
+/** Single batch entry recording every pattern brownfield-imported on the
+ *  first mutation (SPEC §2.4). The pattern list and id list are rendered as
+ *  comma-joined strings so the decision log stays one-line-per-bullet —
+ *  matches the existing rules-add / rec-apply shape. */
+function formatImportDecision(inputs: ImportDecisionInputs): string {
+  const count = inputs.imported.length;
+  const subject = `${count} ${count === 1 ? "pattern" : "patterns"} imported from oxlint preset`;
+  return formatGenericEntry({
+    timestamp: isoUtc(inputs.now),
+    kind: "ignore-import",
+    subject,
+    bullets: [
+      ["kind", "ignore-import"],
+      ["count", String(count)],
+      ["patterns", inputs.imported.map((p) => p.glob).join(", ")],
+      ["ids", inputs.imported.map((p) => p.id).join(", ")],
+      ["author", inputs.author],
+      ["reason", IMPORT_REASON],
+    ],
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Main entry
 // ---------------------------------------------------------------------------
@@ -401,9 +439,22 @@ export function ignoreAdd(
   const manifest: IgnoreManifest =
     loaded.manifest ?? { version: 1, entries: [] };
 
+  // 4a. Brownfield import (T3.4): on the first mutation, scoop up any
+  //    user-authored `ignorePatterns[]` outside the qualy markers and turn
+  //    them into `createdBy: "imported"` entries. No-op when manifest already
+  //    has entries OR no non-marker patterns exist.
+  const importResult = importBrownfieldIgnores(
+    opts.cwd,
+    manifest,
+    now,
+    deps.safeIO,
+  );
+  const enrichedManifest = importResult.manifest;
+  const imported = importResult.imported;
+
   // 5. Upsert entry. `rule` is null for path-only, otherwise the validated
   // rule string (quality-metrics/<name>, category:<name>, or opaque).
-  const upserted = upsertEntry(manifest, {
+  const upserted = upsertEntry(enrichedManifest, {
     glob: opts.glob,
     rule,
     reason,
@@ -428,6 +479,27 @@ export function ignoreAdd(
   }
 
   const filesChanged: string[] = [savedManifest.value.path];
+
+  // 6a. Strip imported patterns from outside the markers so the next compile
+  //    can re-emit them inside the managed block without leaving duplicates.
+  if (imported.length > 0) {
+    const stripped = applyImportToPresets(
+      opts.cwd,
+      imported.map((p) => p.glob),
+      deps.safeIO,
+    );
+    if (!stripped.ok) {
+      return {
+        ok: false,
+        error: stripped.error,
+        reason: stripped.reason,
+        exitCode: EXIT_CODES.RECOVERABLE_ERROR,
+      };
+    }
+    for (const p of stripped.files_changed) {
+      if (!filesChanged.includes(p)) filesChanged.push(p);
+    }
+  }
 
   // 7. Compile presets.
   const compiled = compileToBothPresets(opts.cwd, upserted.manifest, deps.safeIO);
@@ -456,6 +528,23 @@ export function ignoreAdd(
     };
   }
 
+  // Order matters: the brownfield import happened before the user's add/
+  // update, so the decision log records `ignore-import` first when present.
+  let pendingText = loadedDecisions.text;
+  if (imported.length > 0) {
+    const importEntry = formatImportDecision({ imported, author, now });
+    const r = insertEntryBetweenMarkers(pendingText, importEntry);
+    if (!r.ok) {
+      return {
+        ok: false,
+        error: "decisions_failed",
+        reason: r.error,
+        exitCode: EXIT_CODES.RECOVERABLE_ERROR,
+      };
+    }
+    pendingText = r.text;
+  }
+
   const entryText = formatIgnoreDecision({
     action: upserted.action,
     glob: opts.glob,
@@ -466,7 +555,7 @@ export function ignoreAdd(
     author,
     now,
   });
-  const appended = insertEntryBetweenMarkers(loadedDecisions.text, entryText);
+  const appended = insertEntryBetweenMarkers(pendingText, entryText);
   if (!appended.ok) {
     return {
       ok: false,
@@ -502,6 +591,7 @@ export function ignoreAdd(
     expires,
     files_changed: filesChanged,
     decision: { path: decisionsWrite.value.path, appended: true },
+    imported,
     exitCode: EXIT_CODES.OK,
   };
 }
@@ -689,16 +779,18 @@ export function runIgnoreAdd(argv: readonly string[]): ExitCode {
     expires: result.expires,
     files_changed: result.files_changed,
     decision: result.decision,
+    imported: result.imported,
   });
   logger.info("ignore_add_ok", {
     glob: result.glob,
     action: result.action,
     id: result.id,
     files_changed: result.files_changed.length,
+    imported: result.imported.length,
   });
   return result.exitCode;
 }
 
 // Re-exports for tests.
-export { formatIgnoreDecision };
+export { formatImportDecision, formatIgnoreDecision };
 

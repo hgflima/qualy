@@ -288,7 +288,11 @@ describe("ignoreAdd — happy path", () => {
     expect(updateCount).toBe(1);
   });
 
-  it("preserves user patterns outside the qualy markers in presets", () => {
+  it("imports user patterns outside the qualy markers on first mutation (T3.4)", () => {
+    // Brownfield: preset has 2 user-authored patterns outside any markers.
+    // First `ignore-add` should scoop them into the manifest as
+    // `createdBy: "imported"` and re-emit them inside the managed block,
+    // alongside the new user entry.
     const presetWithUserPattern =
       JSON.stringify(
         {
@@ -311,15 +315,74 @@ describe("ignoreAdd — happy path", () => {
       deps(fs),
     );
     expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.imported.map((p) => p.glob)).toEqual(["dist/**", "build/**"]);
 
+    // Manifest now carries 3 entries: 2 imported + 1 user-authored.
+    const manifest = JSON.parse(
+      fs.files.get(`/repo/${IGNORE_MANIFEST_PATH}`)!,
+    );
+    expect(manifest.entries).toHaveLength(3);
+    const byCreator = new Map<string, string[]>();
+    for (const e of manifest.entries) {
+      const arr = byCreator.get(e.createdBy) ?? [];
+      arr.push(e.glob);
+      byCreator.set(e.createdBy, arr);
+    }
+    expect(byCreator.get("imported")?.sort()).toEqual(
+      ["build/**", "dist/**"].sort(),
+    );
+    expect(byCreator.get("user")).toEqual(["src/legacy/**"]);
+
+    // Preset now wraps every pattern inside the managed marker block. Nothing
+    // sits outside (the original outside-marker entries were stripped before
+    // compile re-emitted them inside).
     const fast = JSON.parse(fs.files.get(`/repo/${PRESET_PATHS.fast}`)!);
-    expect(fast.ignorePatterns).toEqual([
-      "dist/**",
-      "build/**",
-      IGNORE_MARKER_START,
-      "src/legacy/**",
-      IGNORE_MARKER_END,
-    ]);
+    const ip = fast.ignorePatterns as string[];
+    expect(ip[0]).toBe(IGNORE_MARKER_START);
+    expect(ip[ip.length - 1]).toBe(IGNORE_MARKER_END);
+    expect(new Set(ip.slice(1, -1))).toEqual(
+      new Set(["dist/**", "build/**", "src/legacy/**"]),
+    );
+    // No duplicates outside.
+    expect(ip.filter((p) => p === "dist/**")).toHaveLength(1);
+
+    // Decision log records the import as a single batch entry, then the add.
+    const log = fs.files.get(`/repo/${DECISION_LOG_PATH}`)!;
+    expect(log).toMatch(/kind\*\*: ignore-import/);
+    expect(log).toMatch(/count\*\*: 2/);
+    expect(log).toMatch(/kind\*\*: ignore-add/);
+    // Import comes BEFORE add in the log (chronological order).
+    expect(log.indexOf("ignore-import")).toBeLessThan(
+      log.indexOf("ignore-add:"),
+    );
+  });
+
+  it("does not re-import on subsequent mutations (T3.4 — only the first)", () => {
+    const presetWithUserPattern =
+      JSON.stringify({ ignorePatterns: ["dist/**"] }, null, 2) + "\n";
+    const fs = makeFs({
+      [`/repo/${PRESET_PATHS.fast}`]: presetWithUserPattern,
+      [`/repo/${PRESET_PATHS.deep}`]: presetWithUserPattern,
+    });
+    const first = ignoreAdd(
+      { cwd: "/repo", glob: "src/legacy/**", reason: "legacy", expires: null },
+      deps(fs),
+    );
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(first.imported.map((p) => p.glob)).toEqual(["dist/**"]);
+
+    const second = ignoreAdd(
+      { cwd: "/repo", glob: "src/other/**", reason: "other", expires: null },
+      deps(fs),
+    );
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(second.imported).toEqual([]);
+    // Only one batch import entry in the decision log.
+    const log = fs.files.get(`/repo/${DECISION_LOG_PATH}`)!;
+    expect((log.match(/kind\*\*: ignore-import\b/g) ?? []).length).toBe(1);
   });
 });
 

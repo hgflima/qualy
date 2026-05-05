@@ -161,13 +161,14 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/ignore-{add,list}.test.ts` ✓ (42/42 incluindo 12 novos casos de `--rule`/category); full suite 2298 ✓; e2e 35 ✓; `npm run typecheck` ✓.
   - Deps: 3.1, 3.2, 2.4 — satisfeitos.
 
-- [ ] **3.4 — `lib/ignore-import.ts` (brownfield)** · M
-  - Detecta non-marker patterns em presets, importa com `createdBy: "imported"`
-  - Decision log: 1 batch entry `ignore-import`
-  - Hook em `commands/ignore/add.ts` na 1ª mutação (manifest vazio)
-  - Skip em invocações subsequentes
-  - Verify: `npx vitest run cli/tests/unit/ignore-import.test.ts` (brownfield 3, greenfield 0, pre-managed 0)
-  - Deps: 2.1, 2.2
+- [x] **3.4 — `lib/ignore-import.ts` (brownfield)** · M
+  - `extractNonMarkerPatterns(preset)` (pure) lista patterns fora do par `_qualy:start_/end_`; markers ausentes → todos importáveis; markers out-of-order tratados como ausentes (filtra os marker strings em todo caso).
+  - `importBrownfieldIgnores(cwd, manifest, now, io)` deduplica fast+deep (encounter order: fast-first, then deep), gera entries `createdBy: "imported"`, `reason: IMPORT_REASON`, `expires: null`, `id = generateEntryId(glob, null)`. Skip silencioso quando `manifest.entries.length > 0` ou patterns = 0 ou preset malformed (deixa `compileToBothPresets` surfacing `preset_malformed`).
+  - `stripImportedFromPreset` + `applyImportToPresets(cwd, imported, io)` (escreve via `safeWriteFile` kind `"preset"` merged) removem patterns de fora dos markers ANTES do compile, evitando duplicação dentro+fora.
+  - Wired em `commands/ignore/add.ts`: load manifest → import (no-op se non-empty) → upsert → save → applyImport (se imported.length>0) → compile → decision log com entry `ignore-import` ANTES de `ignore-add`/`ignore-update`. `IgnoreAddOk.imported: ImportedPattern[]` exposto no JSON output (vazio em greenfield/subsequent calls).
+  - Existing test "preserves user patterns outside markers" reescrito para refletir nova semântica (T3.4 supersede): brownfield → patterns importados, manifest 3 entries, preset wraps tudo dentro markers, decision log `ignore-import` seguido de `ignore-add`. Idempotência da 2ª mutação (não re-importa) coberta por novo it().
+  - Verify: `npx vitest run cli/tests/unit/ignore-import.test.ts cli/tests/unit/ignore-add.test.ts` ✓ (50/50 incluindo 22 novos casos T3.4); full suite 2321 verde ✓; e2e 35/35 ✓ (snapshot `pack-contents.test.ts.snap` refrescado para `cli/src/lib/ignore-import.ts`); `npm run typecheck` ✓.
+  - Deps: 2.1, 2.2 — satisfeitos.
 
 - [ ] **3.4b — `commands/ignore/import-preview.ts` (`qualy ignore-import-preview`)** · S
   - Subcomando read-only: lê presets + manifest, retorna JSON `{ ok, manifest_empty, would_import: [{ glob, tier }], count }`. Sem side-effects.
