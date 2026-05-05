@@ -22,6 +22,7 @@ exports[`e2e: npm pack contents > snapshot of the full sorted file list 1`] = `
   "cli/src/commands/ignore/add.ts",
   "cli/src/commands/ignore/compile.ts",
   "cli/src/commands/ignore/explain.ts",
+  "cli/src/commands/ignore/import-preview.ts",
   "cli/src/commands/ignore/list.ts",
   "cli/src/commands/ignore/remove.ts",
   "cli/src/commands/install/coverage.ts",

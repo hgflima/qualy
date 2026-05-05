@@ -170,14 +170,16 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/ignore-import.test.ts cli/tests/unit/ignore-add.test.ts` ✓ (50/50 incluindo 22 novos casos T3.4); full suite 2321 verde ✓; e2e 35/35 ✓ (snapshot `pack-contents.test.ts.snap` refrescado para `cli/src/lib/ignore-import.ts`); `npm run typecheck` ✓.
   - Deps: 2.1, 2.2 — satisfeitos.
 
-- [ ] **3.4b — `commands/ignore/import-preview.ts` (`qualy ignore-import-preview`)** · S
+- [x] **3.4b — `commands/ignore/import-preview.ts` (`qualy ignore-import-preview`)** · S
   - Subcomando read-only: lê presets + manifest, retorna JSON `{ ok, manifest_empty, would_import: [{ glob, tier }], count }`. Sem side-effects.
   - **Justificativa:** o slash command `/lint:ignore:add` precisa decidir se mostra `AskUserQuestion` (≥5 patterns) ANTES de invocar `qualy ignore-add`. Sem este subcomando, o slash teria que (a) duplicar a lógica de detecção em markdown ou (b) inspecionar o preset cru com Bash — ambas fragilizam o contrato. Esse subcomando expõe o "import preview" deterministicamente.
-  - Reutiliza helpers de `lib/ignore-import.ts` (T3.4) — só não escreve.
-  - Adicionar entry em `SUBCOMMAND_LIST`/`HANDLER_OVERRIDES` (1 a mais que T2.6).
-  - Verify: `npx vitest run cli/tests/unit/ignore-import-preview.test.ts` cobrindo brownfield (returns count > 0), pre-managed (count = 0), greenfield (count = 0), manifest non-empty (count = 0, skip).
-  - Files: `cli/src/commands/ignore/import-preview.ts`, test correspondente, UPDATE `cli/src/index.ts`.
-  - Deps: 3.4
+  - Reutiliza helpers de `lib/ignore-import.ts` (`extractNonMarkerPatterns`) — só não escreve. Dedup encounter-order é fast-first/then-deep, espelhando `importBrownfieldIgnores` para que slash command e a mutação propriamente dita reportem a mesma lista.
+  - `would_import[].tier` é o tier onde o pattern foi encontrado pela primeira vez. Pattern compartilhado entre fast+deep aparece uma vez com `tier: "fast"`.
+  - Manifest non-empty → `manifest_empty: false`, `count: 0`, `would_import: []` sem ler presets (paridade com early-return de `importBrownfieldIgnores`). Manifest corrupt → exit `70` `manifest_corrupt` (paridade com `ignore-add`/`ignore-compile`).
+  - Wired em `SUBCOMMAND_LIST` + `HANDLER_OVERRIDES` (subcomando #6 do grupo `ignore-*`). `index-help.test.ts` (3 it() blocks) atualizado para cobrir o novo entry.
+  - Snapshot `pack-contents.test.ts.snap` refrescado para incluir `cli/src/commands/ignore/import-preview.ts`.
+  - Verify: `npx vitest run cli/tests/unit/ignore-import-preview.test.ts` ✓ (14 it() blocks: parser × 4, brownfield × 2, pre-managed, greenfield × 3, manifest non-empty, corrupt × 2, read-only); full suite 2335 ✓; e2e 35/35 ✓; `npm run typecheck` ✓.
+  - Deps: 3.4 — satisfeitos.
 
 - [ ] **3.5 — Slash commands restantes + flow `category:*` em `add.md`** · M
   - 3 markdowns: `/lint:ignore:{remove,list,explain}`
@@ -264,7 +266,7 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
 - [ ] #12 — Drift: edit manual em `ignore.json` recompila no próximo `audit` (não há `qualy lint`); sem mudança pula
 - [ ] (extra) Migração one-time `docs/lint-decisions.md` → `.harn/qualy/docs/`; conflict → exit `1`
 - [ ] (extra) Manifesto corrompido (T2.8) → exit `70` com `error: "manifest_corrupt"` (SPEC §3.1 lista "5"; canônico é INTERNAL_ERROR=70 pois MISSING_DEPENDENCY=5 não é semanticamente correto)
-- [ ] (extra) `qualy ignore-import-preview` (T3.4b) read-only retorna count + lista para slash command threshold ≥5 (preview API, não muta nada)
+- [x] (extra) `qualy ignore-import-preview` (T3.4b) read-only retorna count + lista para slash command threshold ≥5 (preview API, não muta nada)
 
 ## Blocked (Ralph)
 

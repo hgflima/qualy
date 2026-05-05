@@ -39,6 +39,7 @@ import { runHarnessUpdate } from "./install/update.ts";
 import { runIgnoreAdd } from "./commands/ignore/add.ts";
 import { runIgnoreCompile } from "./commands/ignore/compile.ts";
 import { runIgnoreExplain } from "./commands/ignore/explain.ts";
+import { runIgnoreImportPreview } from "./commands/ignore/import-preview.ts";
 import { runIgnoreList } from "./commands/ignore/list.ts";
 import { runIgnoreRemove } from "./commands/ignore/remove.ts";
 import { runRecsApply } from "./commands/recs/apply.ts";
@@ -112,6 +113,7 @@ const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> =
   ["ignore-list", "List ignore entries with status (active/expired) and origin"],
   ["ignore-remove", "Remove an ignore entry (--reason required) and recompile presets"],
   ["ignore-explain", "Explain an ignore entry: details + decision-log history"],
+  ["ignore-import-preview", "Preview brownfield patterns that would import on next ignore mutation"],
   ["status", "Aggregate versions, presets, stage, hooks, coverage, theme"],
   ["report-data", "Aggregate audit + history + coverage + git into report JSON"],
   ["report-serve", "Serve the visual report on 127.0.0.1 (long-running)"],
@@ -154,6 +156,7 @@ const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ["ignore-add", runIgnoreAdd],
   ["ignore-compile", runIgnoreCompile],
   ["ignore-explain", runIgnoreExplain],
+  ["ignore-import-preview", runIgnoreImportPreview],
   ["ignore-list", runIgnoreList],
   ["ignore-remove", runIgnoreRemove],
   ["status", runStatus],
