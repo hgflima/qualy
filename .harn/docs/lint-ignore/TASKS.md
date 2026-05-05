@@ -49,7 +49,7 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
 
 ## Phase 2 — Path-only ignore (vertical slice)
 
-- [ ] **2.1 — `lib/ignore-manifest.ts`** · M
+- [x] **2.1 — `lib/ignore-manifest.ts`** · M
   - Tipos `IgnoreEntry`, `IgnoreManifest { version: 1, entries }`
   - `loadIgnoreManifest`, `saveIgnoreManifest` (via `safeWriteFile` kind `"ignore"`), `generateEntryId`, `upsertEntry`, `removeEntries`, `validateGlob`, `validateExpires`, `findExpired`
   - Estender `ManifestEntryKind` em `fs-safe.ts:55` com `"ignore"`
