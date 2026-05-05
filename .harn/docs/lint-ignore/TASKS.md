@@ -193,21 +193,22 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Deps: 3.3, 2.7, 2.5, 3.4b — satisfeitos.
 
 ### ✅ Checkpoint Phase 3
-- [ ] SPEC §10 #2 (per-rule), #6 (brownfield import), #9 (re-add update), #10 (category sem ack), #11 (slash + category) verdes
-- [ ] Decision log com entries `ignore-add`, `ignore-update`, `ignore-remove`, `ignore-import`
+- [x] SPEC §10 #2 (per-rule), #6 (brownfield import), #9 (re-add update), #10 (category sem ack), #11 (slash + category) verdes
+- [x] Decision log com entries `ignore-add`, `ignore-update`, `ignore-remove`, `ignore-import`
 
 ---
 
 ## Phase 4 — Polish + e2e
 
-- [ ] **4.1 — Drift check em `audit.ts`** · M
-  - `lib/ignore-drift.ts` com `checkDriftAndRecompile(cwd, deps)` via `statSync` mtimes
-  - `commands/audit.ts` invoca no topo do pipeline
-  - Manifest ausente → no-op
-  - Log `ignore_recompile_drift` quando recompila
+- [x] **4.1 — Drift check em `audit.ts`** · M
+  - `cli/src/lib/ignore-drift.ts` com `checkDriftAndRecompile(cwd, deps)` via `statFn` (default `node:fs.statSync`) injetável. Estados: `manifest_absent` (no-op cheap), `preset_missing` (no-op — audit já surface erro próprio), `presets_fresh` (mtime do manifest ≤ menor mtime de fast/deep), recompila quando manifest é mais novo que QUALQUER preset OU quando só 1 dos 2 presets está presente (deixa `compileToBothPresets` levantar `preset_missing` próprio).
+  - TOCTOU degradado: stat reporta manifest mas `loadIgnoreManifest` retorna `null` (delete-after-stat) → `manifest_absent` em vez de crash. Manifest corrupt/version mismatch propaga `manifest_corrupt`/`manifest_unsupported_version`.
+  - `cli/src/commands/audit.ts` invoca `checkDriftAndRecompile` logo após o strict gate (antes de `resolveTier`). `AuditDeps` ganha `statFn?` + `checkDriftFn?` para tests injetarem mock determinístico. Drift error (`manifest_corrupt` etc) propaga como `audit` failure (skips oxlint subprocess); `recompiled: true` emite `logger.info("ignore_recompile_drift", { files_changed })`.
   - **Nota:** SPEC §2.3 / §10 #5/#12 falam em `qualy lint` + `qualy audit`. O CLI só expõe `audit` (não há `lint` em `SUBCOMMAND_LIST`); drift check + expired warnings entram exclusivamente em `commands/audit.ts`. Se um `qualy lint` for adicionado depois (fora de v1), reaproveitar o mesmo helper.
-  - Verify: `npx vitest run cli/tests/unit/{ignore-drift,audit}.test.ts`
-  - Deps: 2.2, 3.2
+  - **Default-stat fallback (preserva compat com testes existentes):** quando `statFn` ausente e não há `.harn/qualy/ignore.json` no disco, `defaultStat` retorna `null` → `manifest_absent` → no-op. Os 60+ testes existentes de `audit.test.ts` (que usam `safeIO` em memória sem manifest) seguem verdes sem alteração.
+  - Snapshot `pack-contents.test.ts.snap` refrescado para incluir `cli/src/lib/ignore-drift.ts`.
+  - Verify: `npx vitest run cli/tests/unit/ignore-drift.test.ts cli/tests/unit/audit.test.ts` ✓ (10 ignore-drift + 4 novos audit drift gate); full unit suite 2455/2455 ✓; e2e 35/35 ✓; `npm run typecheck` ✓.
+  - Deps: 2.2, 3.2 — satisfeitos.
 
 - [ ] **4.2 — Expired warning em `audit`** · S
   - `findExpired` → `logger.warn` stderr + `audit.ignore_warnings: [{ id, glob, expires, days_overdue }]`
@@ -268,10 +269,3 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
 - [ ] (extra) Migração one-time `docs/lint-decisions.md` → `.harn/qualy/docs/`; conflict → exit `1`
 - [ ] (extra) Manifesto corrompido (T2.8) → exit `70` com `error: "manifest_corrupt"` (SPEC §3.1 lista "5"; canônico é INTERNAL_ERROR=70 pois MISSING_DEPENDENCY=5 não é semanticamente correto)
 - [x] (extra) `qualy ignore-import-preview` (T3.4b) read-only retorna count + lista para slash command threshold ≥5 (preview API, não muta nada)
-
-## Blocked (Ralph)
-
-- Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo (stuck after 3 attempts)
-- Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo (stuck after 3 attempts)
-- Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo (stuck after 3 attempts)
-- Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo (stuck after 3 attempts)

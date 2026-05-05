@@ -66,6 +66,11 @@ import {
 import { EXIT_CODES, type ExitCode } from "../lib/exit-codes.ts";
 import { type SafeIO, type SafeResult, safeWriteFile } from "../lib/fs-safe.ts";
 import { dirtyFiles as defaultDirtyFiles } from "../lib/git.ts";
+import {
+  type DriftCheckResult,
+  type StatFn,
+  checkDriftAndRecompile,
+} from "../lib/ignore-drift.ts";
 import { parseDefensive } from "../lib/json.ts";
 import { logger, output } from "../lib/logger.ts";
 import {
@@ -236,6 +241,13 @@ export interface AuditDeps {
   readonly detectTestRunnerFn?: typeof detectTestRunner;
   readonly dirtyFilesFn?: (cwd: string) => SafeResult<readonly string[]>;
   readonly now?: () => Date;
+  /** Stat seam for the on-drift recompile gate (T4.1). */
+  readonly statFn?: StatFn;
+  /** Override for the drift check itself — tests inject canned results. */
+  readonly checkDriftFn?: (
+    cwd: string,
+    deps: { statFn?: StatFn; safeIO?: SafeIO },
+  ) => DriftCheckResult;
 }
 
 function defaultRead(p: string): string | null {
@@ -692,6 +704,24 @@ export function audit(opts: AuditOptions, deps: AuditDeps = {}): AuditResult {
         reason: `working tree is dirty (${dirty.value.length} file(s))`,
       };
     }
+  }
+
+  // On-drift recompile (T4.1). When the user (or a teammate) edits
+  // `.harn/qualy/ignore.json` directly, presets fall out of sync. Recompile
+  // before invoking oxlint so the audit reflects the current manifest. Manifest
+  // absent or already in sync → cheap no-op.
+  const checkDriftFn = deps.checkDriftFn ?? checkDriftAndRecompile;
+  const drift = checkDriftFn(cwd, {
+    safeIO: deps.safeIO,
+    ...(deps.statFn !== undefined ? { statFn: deps.statFn } : {}),
+  });
+  if (!drift.ok) {
+    return { ok: false, error: drift.error, ...(drift.reason ? { reason: drift.reason } : {}) };
+  }
+  if (drift.recompiled) {
+    logger.info("ignore_recompile_drift", {
+      files_changed: drift.files_changed,
+    });
   }
 
   const tier = resolveTier(cwd, opts.tier ?? "deep", existsFn);

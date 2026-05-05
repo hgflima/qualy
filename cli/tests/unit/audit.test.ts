@@ -208,6 +208,7 @@ function makeDeps(
     detectStageFn?: AuditDeps["detectStageFn"];
     detectTestRunnerFn?: AuditDeps["detectTestRunnerFn"];
     dirtyFilesFn?: AuditDeps["dirtyFilesFn"];
+    checkDriftFn?: AuditDeps["checkDriftFn"];
   } = {},
 ): { deps: AuditDeps; io: ReturnType<typeof memoryIO>; calls: { binary: string; args: readonly string[]; cwd: string }[] } {
   const io = memoryIO(options.files ?? {});
@@ -231,6 +232,7 @@ function makeDeps(
     detectTestRunnerFn: options.detectTestRunnerFn ?? fakeRunner(),
     dirtyFilesFn: options.dirtyFilesFn,
     now: () => FIXED_DATE,
+    ...(options.checkDriftFn !== undefined ? { checkDriftFn: options.checkDriftFn } : {}),
   };
   return { deps, io, calls };
 }
@@ -592,6 +594,71 @@ describe("audit — tooling versions", () => {
     expect(result.payload.tooling.oxlint).toBeNull();
     expect(result.payload.tooling.oxfmt).toBeNull();
     expect(result.payload.tooling.quality_metrics).toBeNull();
+  });
+});
+
+describe("audit — ignore-drift gate (T4.1)", () => {
+  it("invokes checkDriftFn before any subprocess and continues on no-op", () => {
+    const driftCalls: { cwd: string }[] = [];
+    const { deps } = makeDeps({
+      files: { [pathJoin(ROOT, "oxlint.deep.json")]: DEEP_PRESET },
+      runOutput: "[]",
+      checkDriftFn: (cwd) => {
+        driftCalls.push({ cwd });
+        return {
+          ok: true,
+          recompiled: false,
+          reason: "manifest_absent",
+          files_changed: [],
+        };
+      },
+    });
+    const result = audit({ cwd: ROOT }, deps);
+    expect(result.ok).toBe(true);
+    expect(driftCalls).toEqual([{ cwd: ROOT }]);
+  });
+
+  it("recompile result is logged but does not fail audit", () => {
+    const { deps } = makeDeps({
+      files: { [pathJoin(ROOT, "oxlint.deep.json")]: DEEP_PRESET },
+      runOutput: "[]",
+      checkDriftFn: () => ({
+        ok: true,
+        recompiled: true,
+        files_changed: ["oxlint.fast.json", "oxlint.deep.json"],
+      }),
+    });
+    const result = audit({ cwd: ROOT }, deps);
+    expect(result.ok).toBe(true);
+  });
+
+  it("drift error (manifest_corrupt) propagates and skips oxlint", () => {
+    const { deps, calls } = makeDeps({
+      files: { [pathJoin(ROOT, "oxlint.deep.json")]: DEEP_PRESET },
+      checkDriftFn: () => ({
+        ok: false,
+        error: "manifest_corrupt",
+        reason: "JSON parse failed: Unexpected token",
+      }),
+    });
+    const result = audit({ cwd: ROOT }, deps);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe("manifest_corrupt");
+    expect(result.reason).toMatch(/JSON parse failed/);
+    expect(calls).toHaveLength(0); // never spawned oxlint
+  });
+
+  it("default (no manifest, no statFn override) is a silent no-op", () => {
+    // Real defaultStat → statSync against /proj/.harn/qualy/ignore.json which
+    // does not exist on disk → null → manifest_absent. Existing tests rely on
+    // this implicit no-op. This test pins the contract.
+    const { deps } = makeDeps({
+      files: { [pathJoin(ROOT, "oxlint.deep.json")]: DEEP_PRESET },
+      runOutput: "[]",
+    });
+    const result = audit({ cwd: ROOT }, deps);
+    expect(result.ok).toBe(true);
   });
 });
 
