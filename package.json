@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Deterministic CLI + thin Claude Code harness for the qualy/lint skill (oxlint + oxfmt + quality-metrics).",
   "engines": {
-    "node": ">=22.6.0"
+    "node": ">=20.0.0"
   },
   "repository": {
     "type": "git",
@@ -36,16 +36,23 @@
     "lint": "oxlint --config oxlint.fast.json .",
     "test": "vitest run cli/tests/unit",
     "test:e2e": "vitest run cli/tests/e2e",
-    "build": "echo \"[qualy] build: noop — Node 22.6+ executes .ts directly via --experimental-strip-types\" && exit 0",
+    "build": "echo \"[qualy] build: noop — bin/qualy.mjs executes .ts via the tsx loader\" && exit 0",
     "lint:deep": "oxlint --config oxlint.deep.json .",
     "format": "oxfmt --write .",
     "coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.0",
+    "chartjs-chart-treemap": "^3.1.0",
+    "esbuild": "^0.24.0",
+    "ts-morph": "^28.0.0",
+    "tsx": "^4.19.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^2.1.0",
     "oxfmt": "^0.47.0",
     "oxlint": "^1.62.0",
-    "quality-metrics": "^0.1.1",
-    "ts-morph": "^28.0.0"
+    "quality-metrics": "^0.1.1"
   }
 }

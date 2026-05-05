@@ -260,16 +260,17 @@ Manter o threshold global do projeto (definido em `vitest.config.ts`). Os módul
 
 Critérios objetivos e testáveis que precisam estar verdadeiros para a feature ser considerada pronta:
 
-- [ ] `npm publish` (ou `npm pack`) gera tarball `qualy-X.Y.Z.tgz` que contém apenas: `cli/`, `skills/`, `commands/`, `agents/`, `package.json`, `README.md`, `CHANGELOG.md`. Nenhum `.harn/`, `tests/`, `node_modules/`, `.git*`.
-- [ ] `npx ./qualy-X.Y.Z.tgz install --scope local --dry-run` em repo limpo imprime plano de cópia e exit code 0, sem tocar FS.
-- [ ] `npx ./qualy-X.Y.Z.tgz install --scope user` em VM nova (sem repo qualy clonado) deixa `~/.claude/skills/lint/SKILL.md` presente em ≤ 30s.
+- [ ] `npm publish` (ou `npm pack`) gera tarball `hgflima-qualy-X.Y.Z.tgz` (`@hgflima/qualy` com `/` → `-`) que contém apenas: `cli/`, `skills/`, `commands/`, `agents/`, `package.json`, `README.md`, `CHANGELOG.md`. Nenhum `.harn/`, `tests/`, `node_modules/`, `.git*`.
+- [ ] `npx ./hgflima-qualy-X.Y.Z.tgz install --scope local --dry-run` em repo limpo imprime plano de cópia e exit code 0, sem tocar FS.
+- [ ] `npx ./hgflima-qualy-X.Y.Z.tgz install --scope user` em VM nova (sem repo qualy clonado) deixa `~/.claude/skills/lint/SKILL.md` presente em ≤ 30s.
+- [ ] Binário publicado executa pós-`npm install` em projeto limpo (`./node_modules/.bin/qualy --version` exit 0, sem `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`) — coberto por `cli/tests/e2e/install/installed-tarball.test.ts`.
 - [ ] Após `install --scope project`, abrir Claude Code no repo, digitar `/lint:setup` e o slash command roda (i.e., as commands/agents foram descobertos no escopo project).
 - [ ] `qualy uninstall --scope <X>` remove **todos** os paths listados no manifest desse escopo e remove o próprio manifest. `find <scope-root>/.claude/lint*` retorna vazio.
 - [ ] `qualy update` quando há nova versão: imprime `installed: A.B.C → latest: X.Y.Z` e pede confirmação interativa (ou aceita `--yes`).
 - [ ] `qualy install` em escopo já habitado por uma instalação via `install.sh` (sem manifest) sobrescreve e cria manifest novo, sem erro.
 - [ ] Suite de testes (`npm test && npm run test:e2e`) passa, com cobertura ≥ 90% nos módulos novos `cli/src/install/`.
-- [ ] `install.sh` continua funcional para devs (modo `--dev` symlink), com nota no `README.md` indicando que o caminho oficial é `npx qualy`.
-- [ ] `README.md` na raiz documenta a seção "Instalação" priorizando `npx qualy install`, com exemplos para os 3 escopos.
+- [ ] `install.sh` continua funcional para devs (modo `--dev` symlink), com nota no `README.md` indicando que o caminho oficial é `npx @hgflima/qualy`.
+- [ ] `README.md` na raiz documenta a seção "Instalação" priorizando `npx @hgflima/qualy install`, com exemplos para os 3 escopos.
 
 ---
 

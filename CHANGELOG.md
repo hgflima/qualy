@@ -13,6 +13,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Pacote publicado executa pós-`npm install`.** O shim `bin/qualy.mjs`
+  passa a usar `tsx` como runtime (resolvido via
+  `createRequire(import.meta.url).resolve("tsx/cli")`) em vez de
+  `node --experimental-strip-types`. A flag nativa do Node recusa-se por
+  design a stripar tipos de arquivos dentro de `node_modules/`, o que
+  tornava `@hgflima/qualy@0.1.0` não-executável após `npm install` ou `npx`
+  (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`). Ver
+  [ADR 0011](./docs/adrs/0011-tsx-runtime.md).
+
+### Changed
+
+- **`engines.node` de `>=22.6.0` para `>=20.0.0`.** Alinha com o default
+  de `actions/setup-node@v4` no CI e amplia a base de usuários que podem
+  instalar o pacote sem upgrade de Node. tsx suporta Node ≥ 18; fixamos
+  em 20 LTS por paridade.
+- **Runtime deps do CLI publicado migradas para `dependencies` da raiz.**
+  `tsx`, `zod`, `ts-morph`, `esbuild`, `chart.js` e `chartjs-chart-treemap`
+  agora estão em `package.json#dependencies` (raiz). Antes ficavam só em
+  `cli/package.json` (workspace privado, não publicado) e parcialmente em
+  `devDependencies` — o que mascarava `ERR_MODULE_NOT_FOUND` por trás do
+  bug primário de strip-types.
+- **`scripts.build` (noop) atualiza a justificativa** para refletir tsx
+  no lugar de strip-types. Sigue sem build step real (`echo … && exit 0`).
+
+### Added
+
+- E2E `cli/tests/e2e/install/installed-tarball.test.ts` que faz
+  `npm pack` + `npm install <tarball>` em tmpdir e executa o binário
+  publicado (`./node_modules/.bin/qualy --version` e
+  `qualy install --scope local --dry-run`). Trava a regressão do bug acima.
+
 ---
 
 ## [0.1.0] — 2026-05-04

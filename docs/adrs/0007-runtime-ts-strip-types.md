@@ -1,8 +1,8 @@
 # ADR 0007 — Runtime TS via `node --experimental-strip-types` (Node ≥ 22.6)
 
-- Status: aceito
+- Status: superseded by ADR 0011 (2026-05-05)
 - Data: 2026-05-03
-- Relacionados: ADR 0006 (CLI determinístico com harness fino), ADR 0009 (distribuição via `install.sh`)
+- Relacionados: ADR 0006 (CLI determinístico com harness fino), ADR 0009 (distribuição via `install.sh`), ADR 0011 (substitui o runtime por tsx)
 
 ## Contexto
 

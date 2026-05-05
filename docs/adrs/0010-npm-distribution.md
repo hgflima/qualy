@@ -49,6 +49,8 @@ Cinco subdecisões abaixo (D1–D5) detalham os pontos não-óbvios. Todas foram
 
 **Rationale.** ~15 linhas, zero deps, portável em qualquer Unix. Custa ~30-50ms de overhead por invocação (irrelevante para `install`/`update`, que medem em segundos). `env -S "node --experimental-strip-types"` na shebang do `index.ts` foi rejeitado: exige `coreutils >= 8.30`, instável em macOS pré-Sequoia e WSL básico, e mascara o requisito de Node em uma camada de Bash que a maioria dos usuários não inspeciona. Pre-compile via esbuild foi rejeitado por violar o "sem build step" da SPEC (ADR 0007).
 
+> **Amended em 2026-05-05** — ADR 0011 mantém o shim e a forma de invocação (spawn de child com runtime scoped), mas troca `--experimental-strip-types` por `tsx` resolvido via `createRequire(import.meta.url).resolve("tsx/cli")`. Motivação: Node recusa-se por design a stripar tipos de arquivos dentro de `node_modules/`, o que tornava o pacote publicado não-executável. Ver ADR 0011 para detalhes.
+
 ### D4 — Como `qualy update` descobre `latest`
 
 **Problema.** SPEC §1 diz que o CLI detecta nova versão no npm — é a primeira (e única) operação que toca a rede. Precisa decidir o mecanismo, com timeout claro e mapeamento de erros úteis.
