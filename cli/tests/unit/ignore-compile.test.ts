@@ -1,19 +1,23 @@
 /**
- * Contract tests for `lib/ignore-compile.ts` (lint-ignore PLAN T2.2).
+ * Contract tests for `lib/ignore-compile.ts` (lint-ignore PLAN T2.2 + T3.2).
  *
- * Phase 2 path-only: only entries with `rule === null` are projected into
- * `ignorePatterns[]` between the `_qualy:start_`/`_qualy:end_` sentinels.
- * Per-rule entries are deferred to Phase 3 (`overrides[]`).
+ * Two projections, both bounded by `_qualy:start_`/`_qualy:end_` markers:
+ *  - Path-only entries (`rule === null`) → `ignorePatterns[]` (T2.2).
+ *  - Per-rule entries (`rule !== null`) → `overrides[]` blocks (T3.2),
+ *    with `category:*` expanded via `category-catalog`.
  *
  * Invariants pinned by these tests:
  *
  *  - Output is deterministic (entries sorted by id; same input → same output)
  *  - Idempotent (compile(compile(x)) === compile(x)); `changed: false` on a
  *    second pass with no manifest mutation
- *  - Markers preserved exactly; user patterns OUTSIDE the markers preserved
- *    byte-a-byte (we never touch them)
- *  - Empty manifest → `[start, end]` pair
- *  - `rule !== null` entries are silently skipped in Phase 2 (defer to P3)
+ *  - ignorePatterns markers always emitted; overrides markers only emitted
+ *    when manifest has per-rule entries OR markers already exist (asymmetry
+ *    noted in compile.ts header — avoids inflating brownfield presets that
+ *    only use path-only ignores)
+ *  - User patterns OUTSIDE the markers preserved byte-a-byte
+ *  - Multiple per-rule entries with the same glob collapse into a single
+ *    override block; rules within a block are alphabetically sorted
  *  - Other preset keys (`rules`, `categories`, `plugins`, `_comment`, etc.)
  *    are preserved exactly
  */
@@ -102,13 +106,13 @@ describe("compileToPreset — path-only (Phase 2)", () => {
     ]);
   });
 
-  it("entries with rule !== null are skipped in Phase 2", () => {
+  it("path-only and per-rule entries route to ignorePatterns and overrides respectively", () => {
     const manifest: IgnoreManifest = {
       version: 1,
       entries: [
         mkEntry("src/x/**", null, "ign-aaaaaa"),
         mkEntry("src/x/**", "quality-metrics/wmc", "ign-bbbbbb"),
-        mkEntry("src/y/**", "category:correctness", "ign-cccccc"),
+        mkEntry("src/y/**", "eslint/no-debugger", "ign-cccccc"),
       ],
     };
     const r = compileToPreset({}, manifest);
@@ -118,6 +122,12 @@ describe("compileToPreset — path-only (Phase 2)", () => {
       IGNORE_MARKER_START,
       "src/x/**",
       IGNORE_MARKER_END,
+    ]);
+    expect(r.proposed.overrides).toEqual([
+      { files: [], rules: { [IGNORE_MARKER_START]: "off" } },
+      { files: ["src/x/**"], rules: { "quality-metrics/wmc": "off" } },
+      { files: ["src/y/**"], rules: { "eslint/no-debugger": "off" } },
+      { files: [], rules: { [IGNORE_MARKER_END]: "off" } },
     ]);
   });
 
@@ -211,6 +221,279 @@ describe("compileToPreset — path-only (Phase 2)", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.changed).toBe(false);
+  });
+});
+
+describe("compileToPreset — overrides (Phase 3, T3.2)", () => {
+  it("greenfield with empty manifest does NOT add an `overrides` key", () => {
+    const r = compileToPreset({}, EMPTY_MANIFEST);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect("overrides" in r.proposed).toBe(false);
+  });
+
+  it("path-only-only manifest does NOT touch overrides (no markers added)", () => {
+    const manifest: IgnoreManifest = {
+      version: 1,
+      entries: [mkEntry("src/legacy/**", null, "ign-aaaaaa")],
+    };
+    const r = compileToPreset({}, manifest);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect("overrides" in r.proposed).toBe(false);
+  });
+
+  it("single per-rule entry → 1 managed override block wrapped by markers", () => {
+    const manifest: IgnoreManifest = {
+      version: 1,
+      entries: [
+        mkEntry("src/generated/**", "quality-metrics/wmc", "ign-aaaaaa"),
+      ],
+    };
+    const r = compileToPreset({}, manifest);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.proposed.overrides).toEqual([
+      { files: [], rules: { [IGNORE_MARKER_START]: "off" } },
+      { files: ["src/generated/**"], rules: { "quality-metrics/wmc": "off" } },
+      { files: [], rules: { [IGNORE_MARKER_END]: "off" } },
+    ]);
+    expect(r.changed).toBe(true);
+  });
+
+  it("multiple per-rule entries on the same glob collapse into 1 block, rules sorted", () => {
+    const manifest: IgnoreManifest = {
+      version: 1,
+      entries: [
+        mkEntry("src/x/**", "quality-metrics/wmc", "ign-aaaaaa"),
+        mkEntry("src/x/**", "eslint/no-debugger", "ign-bbbbbb"),
+        mkEntry("src/x/**", "eslint/no-eval", "ign-cccccc"),
+      ],
+    };
+    const r = compileToPreset({}, manifest);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const overrides = r.proposed.overrides as readonly unknown[];
+    // 1 start + 1 grouped block + 1 end = 3 entries
+    expect(overrides).toHaveLength(3);
+    expect(overrides[1]).toEqual({
+      files: ["src/x/**"],
+      rules: {
+        "eslint/no-debugger": "off",
+        "eslint/no-eval": "off",
+        "quality-metrics/wmc": "off",
+      },
+    });
+    // Verify rules iteration order (alphabetical)
+    const block = overrides[1] as { rules: Record<string, string> };
+    expect(Object.keys(block.rules)).toEqual([
+      "eslint/no-debugger",
+      "eslint/no-eval",
+      "quality-metrics/wmc",
+    ]);
+  });
+
+  it("category:perf expands to all 13 catalog rules in a single block", () => {
+    const manifest: IgnoreManifest = {
+      version: 1,
+      entries: [
+        mkEntry("src/generated/**", "category:perf", "ign-aaaaaa"),
+      ],
+    };
+    const r = compileToPreset({}, manifest);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const overrides = r.proposed.overrides as readonly unknown[];
+    expect(overrides).toHaveLength(3); // start + 1 block + end
+    const block = overrides[1] as {
+      files: readonly string[];
+      rules: Record<string, string>;
+    };
+    expect(block.files).toEqual(["src/generated/**"]);
+    expect(Object.keys(block.rules)).toHaveLength(13);
+    // Spot-check known perf-category rules
+    expect(block.rules["unicorn/prefer-set-has"]).toBe("off");
+    expect(block.rules["react/jsx-no-constructed-context-values"]).toBe("off");
+  });
+
+  it("category:* + named rule on the same glob merge into one block", () => {
+    const manifest: IgnoreManifest = {
+      version: 1,
+      entries: [
+        mkEntry("src/x/**", "category:perf", "ign-aaaaaa"),
+        mkEntry("src/x/**", "eslint/no-debugger", "ign-bbbbbb"),
+      ],
+    };
+    const r = compileToPreset({}, manifest);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const overrides = r.proposed.overrides as readonly unknown[];
+    expect(overrides).toHaveLength(3);
+    const block = overrides[1] as {
+      files: readonly string[];
+      rules: Record<string, string>;
+    };
+    expect(block.files).toEqual(["src/x/**"]);
+    // 13 perf rules + eslint/no-debugger = 14 entries
+    expect(Object.keys(block.rules)).toHaveLength(14);
+    expect(block.rules["eslint/no-debugger"]).toBe("off");
+  });
+
+  it("unknown category falls through opaque (single rule named `category:foo`)", () => {
+    const manifest: IgnoreManifest = {
+      version: 1,
+      entries: [
+        mkEntry("src/x/**", "category:foo", "ign-aaaaaa"),
+      ],
+    };
+    const r = compileToPreset({}, manifest);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const overrides = r.proposed.overrides as readonly unknown[];
+    expect(overrides[1]).toEqual({
+      files: ["src/x/**"],
+      rules: { "category:foo": "off" },
+    });
+  });
+
+  it("multiple globs produce multiple blocks, ordered deterministically by id-sort", () => {
+    const manifest: IgnoreManifest = {
+      version: 1,
+      entries: [
+        mkEntry("src/z/**", "eslint/no-debugger", "ign-zzzzzz"),
+        mkEntry("src/a/**", "eslint/no-eval", "ign-aaaaaa"),
+        mkEntry("src/m/**", "eslint/no-alert", "ign-mmmmmm"),
+      ],
+    };
+    const r = compileToPreset({}, manifest);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const overrides = r.proposed.overrides as readonly unknown[];
+    expect(overrides).toHaveLength(5); // start + 3 blocks + end
+    expect((overrides[1] as { files: string[] }).files).toEqual(["src/a/**"]);
+    expect((overrides[2] as { files: string[] }).files).toEqual(["src/m/**"]);
+    expect((overrides[3] as { files: string[] }).files).toEqual(["src/z/**"]);
+  });
+
+  it("preserves user-authored override blocks OUTSIDE the markers", () => {
+    const userBlock = {
+      files: ["**/*.test.ts"],
+      rules: { "typescript/no-explicit-any": "off" },
+    };
+    const current = {
+      overrides: [
+        userBlock,
+        { files: [], rules: { [IGNORE_MARKER_START]: "off" } },
+        { files: ["old/**"], rules: { "eslint/no-debugger": "off" } },
+        { files: [], rules: { [IGNORE_MARKER_END]: "off" } },
+      ],
+    };
+    const manifest: IgnoreManifest = {
+      version: 1,
+      entries: [
+        mkEntry("new/**", "eslint/no-eval", "ign-aaaaaa"),
+      ],
+    };
+    const r = compileToPreset(current, manifest);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const overrides = r.proposed.overrides as readonly unknown[];
+    expect(overrides[0]).toEqual(userBlock);
+    expect(overrides[1]).toEqual({
+      files: [],
+      rules: { [IGNORE_MARKER_START]: "off" },
+    });
+    expect(overrides[2]).toEqual({
+      files: ["new/**"],
+      rules: { "eslint/no-eval": "off" },
+    });
+    expect(overrides[3]).toEqual({
+      files: [],
+      rules: { [IGNORE_MARKER_END]: "off" },
+    });
+  });
+
+  it("appends managed overrides block when no markers exist", () => {
+    const userBlock = {
+      files: ["**/*.test.ts"],
+      rules: { "typescript/no-explicit-any": "off" },
+    };
+    const current = { overrides: [userBlock] };
+    const manifest: IgnoreManifest = {
+      version: 1,
+      entries: [mkEntry("src/x/**", "eslint/no-eval", "ign-aaaaaa")],
+    };
+    const r = compileToPreset(current, manifest);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const overrides = r.proposed.overrides as readonly unknown[];
+    expect(overrides).toHaveLength(4);
+    expect(overrides[0]).toEqual(userBlock);
+    expect(overrides[3]).toEqual({
+      files: [],
+      rules: { [IGNORE_MARKER_END]: "off" },
+    });
+  });
+
+  it("idempotent for mixed manifest (path-only + per-rule + category)", () => {
+    const manifest: IgnoreManifest = {
+      version: 1,
+      entries: [
+        mkEntry("src/legacy/**", null, "ign-aaaaaa"),
+        mkEntry("src/x/**", "quality-metrics/wmc", "ign-bbbbbb"),
+        mkEntry("src/y/**", "category:perf", "ign-cccccc"),
+      ],
+    };
+    const r1 = compileToPreset({}, manifest);
+    expect(r1.ok).toBe(true);
+    if (!r1.ok) return;
+    expect(r1.changed).toBe(true);
+    const r2 = compileToPreset(r1.proposed, manifest);
+    expect(r2.ok).toBe(true);
+    if (!r2.ok) return;
+    expect(r2.changed).toBe(false);
+    expect(JSON.stringify(r2.proposed)).toBe(JSON.stringify(r1.proposed));
+  });
+
+  it("manifest with no per-rule entries strips overrides markers to an empty pair", () => {
+    const current = {
+      overrides: [
+        { files: [], rules: { [IGNORE_MARKER_START]: "off" } },
+        { files: ["old/**"], rules: { "eslint/no-debugger": "off" } },
+        { files: [], rules: { [IGNORE_MARKER_END]: "off" } },
+      ],
+    };
+    const r = compileToPreset(current, EMPTY_MANIFEST);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.proposed.overrides).toEqual([
+      { files: [], rules: { [IGNORE_MARKER_START]: "off" } },
+      { files: [], rules: { [IGNORE_MARKER_END]: "off" } },
+    ]);
+    expect(r.changed).toBe(true);
+  });
+
+  it("`changed: false` when preset already has the expected empty marker pair", () => {
+    const current = {
+      overrides: [
+        { files: [], rules: { [IGNORE_MARKER_START]: "off" } },
+        { files: [], rules: { [IGNORE_MARKER_END]: "off" } },
+      ],
+    };
+    // Manifest must contain at least one per-rule entry so we hit the
+    // overrides codepath; use an entry that produces a single-block diff.
+    const manifest: IgnoreManifest = {
+      version: 1,
+      entries: [mkEntry("src/x/**", "eslint/no-debugger", "ign-aaaaaa")],
+    };
+    const r1 = compileToPreset(current, manifest);
+    expect(r1.ok).toBe(true);
+    if (!r1.ok) return;
+    expect(r1.changed).toBe(true);
+    const r2 = compileToPreset(r1.proposed, manifest);
+    expect(r2.ok).toBe(true);
+    if (!r2.ok) return;
+    expect(r2.changed).toBe(false);
   });
 });
 

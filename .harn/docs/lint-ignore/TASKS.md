@@ -140,13 +140,16 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/category-catalog.test.ts` (27 it() blocks, all green); full suite 2273/2273 verde; `npm run typecheck` ✓.
   - Deps: — (nenhum)
 
-- [ ] **3.2 — Extend `lib/ignore-compile.ts` (overrides + expansion)** · M
-  - Entries `rule != null` → `overrides[]`
-  - `category:*` expandido via `getCategoryRules`
-  - Multiple per-rule mesmo glob → 1 override block agrupado
-  - Markers em forma de objeto: `{ files: [], rules: { "_qualy:start_": "off" } }`
-  - Verify: `npx vitest run cli/tests/unit/ignore-compile.test.ts` (P2 path-only verdes + novos)
-  - Deps: 2.2, 3.1
+- [x] **3.2 — Extend `lib/ignore-compile.ts` (overrides + expansion)** · M
+  - Entries `rule != null` → `overrides[]` ✓
+  - `category:*` expandido via `getCategoryRules` (unknown category falls through opaque) ✓
+  - Multiple per-rule mesmo glob → 1 override block agrupado, rules sorted alphabetically ✓
+  - Markers em forma de objeto: `{ files: [], rules: { "_qualy:start_": "off" } }` ✓
+  - **Asymmetry vs ignorePatterns:** overrides markers só são emitidos quando manifest tem per-rule entries OR markers já existem no preset. `ignorePatterns` sempre emite markers (P2 invariant). Documentado no header de `ignore-compile.ts`. Decisão evita inflar brownfield presets que só usam path-only ignores.
+  - **Block ordering:** globs aparecem em ordem id-sorted (encounter order após sort por id de cada entry contributing). Determinismo preservado sem sort de globs alfabético, pois id é hash determinístico de `(glob, rule)`.
+  - **Test coverage (`ignore-compile.test.ts`):** 12 baseline P2 verdes + 13 novos T3.2 = 25/25 ✓. Cobre: greenfield + path-only só não adiciona overrides; per-rule simples; multiple rules same glob colapsam; category:perf expande para 13 rules; category + named rule merge; unknown category opaque; multiple globs id-ordered; user blocks fora dos markers preservados; append quando sem markers; idempotente para mixed manifest; strip-to-empty quando per-rule remove tudo.
+  - Verify: `npx vitest run cli/tests/unit/ignore-compile.test.ts` ✓ (25/25); full suite 2286/2286 ✓; `npm run typecheck` ✓.
+  - Deps: 2.2, 3.1 — satisfeitos.
 
 - [ ] **3.3 — Extend `commands/ignore/add.ts` (`--rule`)** · M
   - Validar `quality-metrics/*` em `KNOWN_RULES`, `category:<name>` em `KNOWN_CATEGORIES`, outros opaque
