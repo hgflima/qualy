@@ -76,11 +76,80 @@ function loadManifestFromMemory(io: { files: Map<string, string> }): Manifest | 
 
 const STAGES = ["greenfield", "brownfield-moderate", "legacy"] as const;
 
+describe("installOxlint — jsPlugins path resolution", () => {
+  const resolveStub = (id: string, paths: readonly string[]): string => {
+    if (id !== "quality-metrics") throw new Error(`unexpected id ${id}`);
+    return `${paths[0]}/node_modules/quality-metrics/dist/index.js`;
+  };
+
+  it("rewrites the deep preset's jsPlugins[] with an absolute resolved path", () => {
+    const io = memoryIO();
+    const r = installOxlint(
+      { cwd: ROOT, stage: "greenfield" },
+      { safeIO: io, resolveModule: resolveStub },
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const written = io.files.get(join(ROOT, "oxlint.deep.json"));
+    expect(written).toBeDefined();
+    const parsed = JSON.parse(written!) as { jsPlugins?: unknown };
+    expect(parsed.jsPlugins).toEqual([
+      `${ROOT}/node_modules/quality-metrics/dist/index.js`,
+    ]);
+  });
+
+  it("does not touch the fast preset (no jsPlugins to rewrite)", () => {
+    const io = memoryIO();
+    installOxlint(
+      { cwd: ROOT, stage: "greenfield" },
+      { safeIO: io, resolveModule: resolveStub },
+    );
+    const fastBytes = readFileSync(join(PRESETS_DIR, "greenfield.fast.json"), "utf8");
+    expect(io.files.get(join(ROOT, "oxlint.fast.json"))).toBe(fastBytes);
+  });
+
+  it("returns quality_metrics_missing when require.resolve throws", () => {
+    const io = memoryIO();
+    const r = installOxlint(
+      { cwd: ROOT, stage: "greenfield" },
+      {
+        safeIO: io,
+        resolveModule: () => {
+          throw new Error("Cannot find module 'quality-metrics'");
+        },
+      },
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toBe("quality_metrics_missing");
+    expect(r.reason).toContain("quality-metrics");
+    // Nothing should land on disk when we can't resolve the plugin.
+    expect(io.files.has(join(ROOT, "oxlint.deep.json"))).toBe(false);
+  });
+
+  it("is idempotent: rerunning produces the same resolved path", () => {
+    const io = memoryIO();
+    installOxlint(
+      { cwd: ROOT, stage: "greenfield" },
+      { safeIO: io, resolveModule: resolveStub },
+    );
+    const firstWrite = io.files.get(join(ROOT, "oxlint.deep.json"));
+    installOxlint(
+      { cwd: ROOT, stage: "greenfield" },
+      { safeIO: io, resolveModule: resolveStub },
+    );
+    expect(io.files.get(join(ROOT, "oxlint.deep.json"))).toBe(firstWrite);
+  });
+});
+
 describe("installOxlint — manifest.stage", () => {
+  const stubResolve = (id: string, paths: readonly string[]): string =>
+    `${paths[0]}/node_modules/${id}/dist/index.js`;
+
   for (const stage of STAGES) {
     it(`records stage=${stage} on the manifest after writing presets`, () => {
       const io = memoryIO();
-      installOxlint({ cwd: ROOT, stage }, { safeIO: io });
+      installOxlint({ cwd: ROOT, stage }, { safeIO: io, resolveModule: stubResolve });
       const manifest = loadManifestFromMemory(io);
       expect(manifest).not.toBeNull();
       if (!manifest) return;
@@ -90,17 +159,31 @@ describe("installOxlint — manifest.stage", () => {
 
   it("overwrites stage when re-installing for a different stage", () => {
     const io = memoryIO();
-    installOxlint({ cwd: ROOT, stage: "greenfield" }, { safeIO: io });
-    installOxlint({ cwd: ROOT, stage: "legacy" }, { safeIO: io });
+    installOxlint(
+      { cwd: ROOT, stage: "greenfield" },
+      { safeIO: io, resolveModule: stubResolve },
+    );
+    installOxlint(
+      { cwd: ROOT, stage: "legacy" },
+      { safeIO: io, resolveModule: stubResolve },
+    );
     expect(loadManifestFromMemory(io)?.stage).toBe("legacy");
   });
 });
 
 describe("installOxlint — explicit stage", () => {
+  const stubResolve = (id: string, paths: readonly string[]): string => {
+    if (id !== "quality-metrics") throw new Error(`unexpected id ${id}`);
+    return `${paths[0]}/node_modules/quality-metrics/dist/index.js`;
+  };
+
   for (const stage of STAGES) {
-    it(`writes byte-exact fast+deep presets for stage=${stage}`, () => {
+    it(`writes the fast preset byte-exact for stage=${stage}`, () => {
       const io = memoryIO();
-      const r = installOxlint({ cwd: ROOT, stage }, { safeIO: io });
+      const r = installOxlint(
+        { cwd: ROOT, stage },
+        { safeIO: io, resolveModule: stubResolve },
+      );
       expect(r.ok).toBe(true);
       if (!r.ok) return;
 
@@ -109,14 +192,23 @@ describe("installOxlint — explicit stage", () => {
       expect(r.written).toHaveLength(2);
 
       const fastBytes = readFileSync(join(PRESETS_DIR, `${stage}.fast.json`), "utf8");
-      const deepBytes = readFileSync(join(PRESETS_DIR, `${stage}.deep.json`), "utf8");
       expect(io.files.get(join(ROOT, "oxlint.fast.json"))).toBe(fastBytes);
-      expect(io.files.get(join(ROOT, "oxlint.deep.json"))).toBe(deepBytes);
+    });
+
+    it(`writes the deep preset with jsPlugins path resolved for stage=${stage}`, () => {
+      const io = memoryIO();
+      installOxlint({ cwd: ROOT, stage }, { safeIO: io, resolveModule: stubResolve });
+      const written = io.files.get(join(ROOT, "oxlint.deep.json"));
+      expect(written).toBeDefined();
+      const parsed = JSON.parse(written!) as { jsPlugins?: unknown };
+      expect(parsed.jsPlugins).toEqual([
+        `${ROOT}/node_modules/quality-metrics/dist/index.js`,
+      ]);
     });
 
     it(`records manifest entries with kind=preset for stage=${stage}`, () => {
       const io = memoryIO();
-      installOxlint({ cwd: ROOT, stage }, { safeIO: io });
+      installOxlint({ cwd: ROOT, stage }, { safeIO: io, resolveModule: stubResolve });
       const manifest = loadManifestFromMemory(io);
       expect(manifest).not.toBeNull();
       if (!manifest) return;
@@ -131,12 +223,16 @@ describe("installOxlint — explicit stage", () => {
 });
 
 describe("installOxlint — stage source", () => {
+  const stubResolve = (id: string, paths: readonly string[]): string =>
+    `${paths[0]}/node_modules/${id}/dist/index.js`;
+
   it("delegates to detectStage when --stage is omitted", () => {
     const io = memoryIO();
     const r = installOxlint(
       { cwd: ROOT },
       {
         safeIO: io,
+        resolveModule: stubResolve,
         detectStageFn: () => ({
           ok: true,
           cwd: ROOT,
@@ -221,10 +317,19 @@ describe("installOxlint — error paths", () => {
 });
 
 describe("installOxlint — idempotency", () => {
+  const stubResolve = (id: string, paths: readonly string[]): string =>
+    `${paths[0]}/node_modules/${id}/dist/index.js`;
+
   it("rewriting the same stage leaves a single manifest entry per path", () => {
     const io = memoryIO();
-    installOxlint({ cwd: ROOT, stage: "greenfield" }, { safeIO: io });
-    installOxlint({ cwd: ROOT, stage: "greenfield" }, { safeIO: io });
+    installOxlint(
+      { cwd: ROOT, stage: "greenfield" },
+      { safeIO: io, resolveModule: stubResolve },
+    );
+    installOxlint(
+      { cwd: ROOT, stage: "greenfield" },
+      { safeIO: io, resolveModule: stubResolve },
+    );
     const m = loadManifestFromMemory(io);
     expect(m).not.toBeNull();
     if (!m) return;
@@ -233,12 +338,22 @@ describe("installOxlint — idempotency", () => {
     expect(paths).toEqual(["oxlint.deep.json", "oxlint.fast.json"]);
   });
 
-  it("switching stages overwrites the file in place", () => {
+  it("switching stages overwrites the deep preset with the new stage's thresholds", () => {
     const io = memoryIO();
-    installOxlint({ cwd: ROOT, stage: "greenfield" }, { safeIO: io });
-    installOxlint({ cwd: ROOT, stage: "legacy" }, { safeIO: io });
-    const legacyDeep = readFileSync(join(PRESETS_DIR, "legacy.deep.json"), "utf8");
-    expect(io.files.get(join(ROOT, "oxlint.deep.json"))).toBe(legacyDeep);
+    installOxlint(
+      { cwd: ROOT, stage: "greenfield" },
+      { safeIO: io, resolveModule: stubResolve },
+    );
+    installOxlint(
+      { cwd: ROOT, stage: "legacy" },
+      { safeIO: io, resolveModule: stubResolve },
+    );
+    const written = io.files.get(join(ROOT, "oxlint.deep.json"));
+    expect(written).toBeDefined();
+    const parsed = JSON.parse(written!) as {
+      rules?: Record<string, [string, { max: number }]>;
+    };
+    expect(parsed.rules?.["quality-metrics/wmc"]).toEqual(["warn", { max: 40 }]);
   });
 });
 
