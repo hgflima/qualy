@@ -79,7 +79,7 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/ignore-compile-cmd.test.ts`
   - Deps: 2.2
 
-- [ ] **2.4 — `commands/ignore/add.ts` (path-only)** · M
+- [x] **2.4 — `commands/ignore/add.ts` (path-only)** · M
   - `qualy ignore-add <glob> --reason <txt> [--expires] [--strict]`
   - Flow: parse → `migrateDecisionLogIfNeeded` → `loadIgnoreManifest` → `upsertEntry` → `saveIgnoreManifest` → `compileToBothPresets` → `appendDecisionEntry({ kind: "ignore-add" | "ignore-update" })`
   - Idempotente (re-add com mesmo `(glob, rule)` → `action: "updated"`, kind `ignore-update`)
@@ -255,3 +255,7 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
 - [ ] (extra) Migração one-time `docs/lint-decisions.md` → `.harn/qualy/docs/`; conflict → exit `1`
 - [ ] (extra) Manifesto corrompido (T2.8) → exit `70` com `error: "manifest_corrupt"` (SPEC §3.1 lista "5"; canônico é INTERNAL_ERROR=70 pois MISSING_DEPENDENCY=5 não é semanticamente correto)
 - [ ] (extra) `qualy ignore-import-preview` (T3.4b) read-only retorna count + lista para slash command threshold ≥5 (preview API, não muta nada)
+
+## Blocked (Ralph)
+
+- Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo (stuck after 3 attempts)
