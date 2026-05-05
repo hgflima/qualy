@@ -19,10 +19,10 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/{decision-log,recs-apply,rules-add,rules-remove}.test.ts`
   - Deps: 1.1
 
-- [ ] **1.3 — `lib/decision-log-migration.ts`** · M
+- [x] **1.3 — `lib/decision-log-migration.ts`** · M
   - `migrateDecisionLogIfNeeded(cwd, deps)` com 5 estados (tracked/untracked/conflict/só-novo/nenhum)
   - DI: `existsFn`, `gitMvFn`, `mvFn`, `mkdirFn`, `writeFn`, `readFn`, `now`
-  - Manifest entry `kind: "decisions"` para uninstall
+  - Manifest entry `kind: "decisions"` para uninstall — registrado pelo próximo `safeWriteFile` em rules/recs/ignore (ADR existing)
   - Verify: `npx vitest run cli/tests/unit/decision-log-migration.test.ts`
   - Deps: 1.1, 1.2
 
