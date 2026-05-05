@@ -361,7 +361,7 @@ describe("rulesRemove — write path", () => {
     expect(r.previous).toEqual({ severity: "error", max: 15 });
     expect(r.applied).toBe(true);
     expect(r.files_changed).toContain("oxlint.deep.json");
-    expect(r.files_changed).toContain("docs/lint-decisions.md");
+    expect(r.files_changed).toContain(".harn/qualy/docs/lint-decisions.md");
 
     const newPreset = JSON.parse(fs.files[pj(ROOT, "oxlint.deep.json")]) as {
       rules: Record<string, unknown>;
@@ -441,10 +441,10 @@ describe("rulesRemove — write path", () => {
     expect(r.ok).toBe(true);
     if (!r.ok || r.dry_run) return;
     expect(r.decision).toEqual({
-      path: "docs/lint-decisions.md",
+      path: ".harn/qualy/docs/lint-decisions.md",
       appended: true,
     });
-    const md = fs.files[pj(ROOT, "docs/lint-decisions.md")];
+    const md = fs.files[pj(ROOT, ".harn/qualy/docs/lint-decisions.md")];
     expect(md).toContain("# Lint decisions");
     expect(md).toContain(
       "rule-remove: quality-metrics/wmc (was severity=error, max=15)",
@@ -462,7 +462,7 @@ describe("rulesRemove — write path", () => {
     const fs: FakeFS = {
       files: {
         [pj(ROOT, "oxlint.deep.json")]: deepPresetWithWmc(),
-        [pj(ROOT, "docs/lint-decisions.md")]: existing,
+        [pj(ROOT, ".harn/qualy/docs/lint-decisions.md")]: existing,
       },
     };
     const r = rulesRemove(
@@ -475,7 +475,7 @@ describe("rulesRemove — write path", () => {
     );
     expect(r.ok).toBe(true);
     if (!r.ok || r.dry_run) return;
-    const md = fs.files[pj(ROOT, "docs/lint-decisions.md")];
+    const md = fs.files[pj(ROOT, ".harn/qualy/docs/lint-decisions.md")];
     expect(md).toContain("rule-add: quality-metrics/dit");
     expect(md).toContain("rule-remove: quality-metrics/wmc");
     expect(md.indexOf("rule-add: quality-metrics/dit")).toBeLessThan(
@@ -489,7 +489,7 @@ describe("rulesRemove — write path", () => {
     const fs: FakeFS = {
       files: {
         [pj(ROOT, "oxlint.deep.json")]: deepPresetWithWmc(),
-        [pj(ROOT, "docs/lint-decisions.md")]: broken,
+        [pj(ROOT, ".harn/qualy/docs/lint-decisions.md")]: broken,
       },
     };
     const r = rulesRemove(
@@ -528,7 +528,7 @@ describe("rulesRemove — idempotency", () => {
     expect(first.applied).toBe(true);
 
     const presetAfterFirst = fs.files[pj(ROOT, "oxlint.deep.json")];
-    const decisionsAfterFirst = fs.files[pj(ROOT, "docs/lint-decisions.md")];
+    const decisionsAfterFirst = fs.files[pj(ROOT, ".harn/qualy/docs/lint-decisions.md")];
 
     const second = rulesRemove(
       { cwd: ROOT, rule: "quality-metrics/wmc", reason: "drop again" },
@@ -544,7 +544,7 @@ describe("rulesRemove — idempotency", () => {
 
     // Preset and decisions log remain byte-for-byte unchanged.
     expect(fs.files[pj(ROOT, "oxlint.deep.json")]).toBe(presetAfterFirst);
-    expect(fs.files[pj(ROOT, "docs/lint-decisions.md")]).toBe(
+    expect(fs.files[pj(ROOT, ".harn/qualy/docs/lint-decisions.md")]).toBe(
       decisionsAfterFirst,
     );
   });
@@ -566,7 +566,7 @@ describe("rulesRemove — idempotency", () => {
     expect(r.action).toBe("already-absent");
     expect(r.applied).toBe(false);
     expect(fs.files[pj(ROOT, "oxlint.deep.json")]).toBe(before);
-    expect(fs.files[pj(ROOT, "docs/lint-decisions.md")]).toBeUndefined();
+    expect(fs.files[pj(ROOT, ".harn/qualy/docs/lint-decisions.md")]).toBeUndefined();
   });
 });
 

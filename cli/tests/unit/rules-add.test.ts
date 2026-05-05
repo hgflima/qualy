@@ -460,7 +460,7 @@ describe("rulesAdd — write path", () => {
     expect(r.max).toBe(8);
     expect(r.applied).toBe(true);
     expect(r.files_changed).toContain("oxlint.deep.json");
-    expect(r.files_changed).toContain("docs/lint-decisions.md");
+    expect(r.files_changed).toContain(".harn/qualy/docs/lint-decisions.md");
 
     const newPreset = JSON.parse(fs.files[pj(ROOT, "oxlint.deep.json")]) as {
       rules: Record<string, unknown>;
@@ -535,10 +535,10 @@ describe("rulesAdd — write path", () => {
     expect(r.ok).toBe(true);
     if (!r.ok || r.dry_run) return;
     expect(r.decision).toEqual({
-      path: "docs/lint-decisions.md",
+      path: ".harn/qualy/docs/lint-decisions.md",
       appended: true,
     });
-    const md = fs.files[pj(ROOT, "docs/lint-decisions.md")];
+    const md = fs.files[pj(ROOT, ".harn/qualy/docs/lint-decisions.md")];
     expect(md).toContain("# Lint decisions");
     expect(md).toContain("rule-add: quality-metrics/lcom");
     expect(md).toContain("- **rule**: quality-metrics/lcom");
@@ -553,7 +553,7 @@ describe("rulesAdd — write path", () => {
     const fs: FakeFS = {
       files: {
         [pj(ROOT, "oxlint.deep.json")]: greenfieldDeepPreset(),
-        [pj(ROOT, "docs/lint-decisions.md")]: existing,
+        [pj(ROOT, ".harn/qualy/docs/lint-decisions.md")]: existing,
       },
     };
     const r = rulesAdd(
@@ -562,7 +562,7 @@ describe("rulesAdd — write path", () => {
     );
     expect(r.ok).toBe(true);
     if (!r.ok || r.dry_run) return;
-    const md = fs.files[pj(ROOT, "docs/lint-decisions.md")];
+    const md = fs.files[pj(ROOT, ".harn/qualy/docs/lint-decisions.md")];
     expect(md).toContain("rule-remove: foo");
     expect(md).toContain("rule-add: quality-metrics/dit");
     expect(md.indexOf("rule-remove: foo")).toBeLessThan(
@@ -583,7 +583,7 @@ describe("rulesAdd — write path", () => {
     );
     expect(r.ok).toBe(true);
     if (!r.ok || r.dry_run) return;
-    const md = fs.files[pj(ROOT, "docs/lint-decisions.md")];
+    const md = fs.files[pj(ROOT, ".harn/qualy/docs/lint-decisions.md")];
     expect(md).toContain("- **reason**: (none)");
   });
 });
@@ -611,7 +611,7 @@ describe("rulesAdd — idempotency", () => {
     expect(r1.action).toBe("added");
 
     const presetAfter1 = fs.files[pj(ROOT, "oxlint.deep.json")];
-    const decisionsAfter1 = fs.files[pj(ROOT, "docs/lint-decisions.md")];
+    const decisionsAfter1 = fs.files[pj(ROOT, ".harn/qualy/docs/lint-decisions.md")];
 
     const r2 = rulesAdd(
       { cwd: ROOT, rule: "quality-metrics/cbo", reason: "second" },
@@ -624,7 +624,7 @@ describe("rulesAdd — idempotency", () => {
     expect(r2.files_changed).toEqual([]);
     // No second decision entry, no preset rewrite.
     expect(fs.files[pj(ROOT, "oxlint.deep.json")]).toBe(presetAfter1);
-    expect(fs.files[pj(ROOT, "docs/lint-decisions.md")]).toBe(decisionsAfter1);
+    expect(fs.files[pj(ROOT, ".harn/qualy/docs/lint-decisions.md")]).toBe(decisionsAfter1);
   });
 
   it("running with a different severity changes action to updated and rewrites preset", () => {
@@ -679,7 +679,7 @@ describe("rulesAdd — dry-run", () => {
     expect(
       Object.prototype.hasOwnProperty.call(
         fs.files,
-        pj(ROOT, "docs/lint-decisions.md"),
+        pj(ROOT, ".harn/qualy/docs/lint-decisions.md"),
       ),
     ).toBe(false);
   });

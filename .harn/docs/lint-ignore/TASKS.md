@@ -26,7 +26,7 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/decision-log-migration.test.ts`
   - Deps: 1.1, 1.2
 
-- [ ] **1.4 — Wire migração nos 3 entry-points** · S
+- [x] **1.4 — Wire migração nos 3 entry-points** · S
   - Chamar `migrateDecisionLogIfNeeded(cwd)` antes de `loadOrInitDecisions` em `rules/add.ts`, `rules/remove.ts`, `recs/apply.ts`
   - Substituir `DECISIONS_REL` hardcoded por `DECISION_LOG_PATH`
   - Em `decision_log_conflict` → exit `1` com error claro

@@ -1,6 +1,6 @@
 /**
  * `rules-add` — enable an oxlint rule in the project's preset (one tier at a
- * time) and append a `rule-add` entry to `docs/lint-decisions.md`.
+ * time) and append a `rule-add` entry to `.harn/qualy/docs/lint-decisions.md`.
  *
  * SPEC §2 `/lint:rules:add <rule>`: "Adiciona uma rule específica ao preset
  * ativo. Pergunta severidade e threshold. Faz dry-run para mostrar quantos
@@ -8,7 +8,7 @@
  * SPEC §7.9 acceptance: "Add: dry-run mostra arquivos novos violando; pergunta
  * severidade e threshold; aplica."
  * SPEC §6 Always (line 389): every add/remove of a rule must be recorded in
- * `docs/lint-decisions.md` with the user's reason.
+ * `.harn/qualy/docs/lint-decisions.md` with the user's reason.
  *
  * Tier resolution:
  *   - `quality-metrics/*`  → `deep`  (deep is the only preset that loads the
@@ -93,6 +93,11 @@ import {
   insertEntryBetweenMarkers as insertEntryBetweenMarkersFromLib,
   loadOrInitDecisions,
 } from "../../lib/decision-log.ts";
+import {
+  migrateDecisionLogIfNeeded,
+  type DecisionLogMigrationDeps,
+} from "../../lib/decision-log-migration.ts";
+import { DECISION_LOG_PATH } from "../../lib/paths.ts";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -180,6 +185,8 @@ export interface RulesAddDeps {
   readonly mkdtempFn?: (prefix: string) => string;
   readonly writeTmpFn?: (p: string, content: string) => void;
   readonly removeFn?: (p: string) => void;
+  /** Optional override for the one-time decision-log migration helper. */
+  readonly migrationDeps?: DecisionLogMigrationDeps;
 }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +249,6 @@ const PRESET_FILES: Readonly<Record<Tier, string>> = {
   deep: "oxlint.deep.json",
 };
 
-const DECISIONS_REL = "docs/lint-decisions.md";
 const DECISIONS_TEMPLATE_DEFAULT = join(
   dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -871,7 +877,13 @@ export function rulesAdd(
   const now = deps.now ? deps.now() : new Date();
   const author = (deps.authorFn ?? defaultAuthor)(opts.cwd);
   const templatePath = deps.templatePath ?? DECISIONS_TEMPLATE_DEFAULT;
-  const decisionsAbs = join(opts.cwd, DECISIONS_REL);
+
+  const migration = migrateDecisionLogIfNeeded(opts.cwd, deps.migrationDeps);
+  if (!migration.ok) {
+    return { ok: false, error: migration.error, reason: migration.reason };
+  }
+
+  const decisionsAbs = join(opts.cwd, DECISION_LOG_PATH);
   const decisionsRaw = readFileFn(decisionsAbs);
   const loaded = loadOrInitDecisions(decisionsRaw, templatePath, readFileFn);
   if (!loaded.ok) {
@@ -894,7 +906,7 @@ export function rulesAdd(
 
   const decisionsWrite = safeWriteFile(
     opts.cwd,
-    DECISIONS_REL,
+    DECISION_LOG_PATH,
     appended.text,
     { kind: "decisions", merged: decisionsRaw !== null },
     deps.safeIO,
@@ -903,7 +915,7 @@ export function rulesAdd(
     return {
       ok: false,
       error: "decisions_failed",
-      reason: `${DECISIONS_REL}: ${decisionsWrite.error}`,
+      reason: `${DECISION_LOG_PATH}: ${decisionsWrite.error}`,
     };
   }
   filesChanged.push(decisionsWrite.value.path);
@@ -1105,7 +1117,7 @@ export function runRulesAdd(argv: readonly string[]): ExitCode {
           "override.\n" +
           "\n" +
           "On success, writes the preset and appends a `rule-add` entry to\n" +
-          "docs/lint-decisions.md (SPEC §6 line 389). With --dry-run, prints the\n" +
+          ".harn/qualy/docs/lint-decisions.md (SPEC §6 line 389). With --dry-run, prints the\n" +
           "proposed action without writing; add --measure-blast-radius to also\n" +
           "run oxlint twice (current vs. proposed) and report the file delta.\n" +
           "\n" +

@@ -1,12 +1,12 @@
 /**
  * `rules-remove` — disable an oxlint rule in the project's preset (one tier at
- * a time) and append a `rule-remove` entry to `docs/lint-decisions.md`.
+ * a time) and append a `rule-remove` entry to `.harn/qualy/docs/lint-decisions.md`.
  *
  * SPEC §2 `/lint:rules:remove <rule>`: "Remove uma rule específica do preset
- * ativo. Pergunta o motivo (registrado em `docs/lint-decisions.md` no
+ * ativo. Pergunta o motivo (registrado em `.harn/qualy/docs/lint-decisions.md` no
  * projeto-alvo) e confirma."
  * SPEC §6 Always (line 389): every add/remove of a rule must be recorded in
- * `docs/lint-decisions.md` with the user's reason — `--reason` is therefore
+ * `.harn/qualy/docs/lint-decisions.md` with the user's reason — `--reason` is therefore
  * mandatory and must be non-empty.
  *
  * Tier resolution (mirrors `rules-add`):
@@ -71,6 +71,11 @@ import {
   insertEntryBetweenMarkers,
   loadOrInitDecisions,
 } from "../../lib/decision-log.ts";
+import {
+  migrateDecisionLogIfNeeded,
+  type DecisionLogMigrationDeps,
+} from "../../lib/decision-log-migration.ts";
+import { DECISION_LOG_PATH } from "../../lib/paths.ts";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -139,13 +144,14 @@ export interface RulesRemoveDeps {
   readonly dirtyFilesFn?: (
     cwd: string,
   ) => { ok: true; value: readonly string[] } | { ok: false; error: string };
+  /** Optional override for the one-time decision-log migration helper. */
+  readonly migrationDeps?: DecisionLogMigrationDeps;
 }
 
 // ---------------------------------------------------------------------------
 // IO defaults
 // ---------------------------------------------------------------------------
 
-const DECISIONS_REL = "docs/lint-decisions.md";
 const DECISIONS_TEMPLATE_DEFAULT = join(
   dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -330,7 +336,7 @@ export function rulesRemove(
       ok: false,
       error: "reason_required",
       reason:
-        "rules-remove loosens enforcement; --reason <text> is mandatory and recorded in docs/lint-decisions.md",
+        "rules-remove loosens enforcement; --reason <text> is mandatory and recorded in .harn/qualy/docs/lint-decisions.md",
     };
   }
 
@@ -432,7 +438,13 @@ export function rulesRemove(
   const now = deps.now ? deps.now() : new Date();
   const author = (deps.authorFn ?? defaultAuthor)(opts.cwd);
   const templatePath = deps.templatePath ?? DECISIONS_TEMPLATE_DEFAULT;
-  const decisionsAbs = join(opts.cwd, DECISIONS_REL);
+
+  const migration = migrateDecisionLogIfNeeded(opts.cwd, deps.migrationDeps);
+  if (!migration.ok) {
+    return { ok: false, error: migration.error, reason: migration.reason };
+  }
+
+  const decisionsAbs = join(opts.cwd, DECISION_LOG_PATH);
   const decisionsRaw = readFileFn(decisionsAbs);
   const loaded = loadOrInitDecisions(decisionsRaw, templatePath, readFileFn);
   if (!loaded.ok) {
@@ -453,7 +465,7 @@ export function rulesRemove(
 
   const decisionsWrite = safeWriteFile(
     opts.cwd,
-    DECISIONS_REL,
+    DECISION_LOG_PATH,
     appended.text,
     { kind: "decisions", merged: decisionsRaw !== null },
     deps.safeIO,
@@ -462,7 +474,7 @@ export function rulesRemove(
     return {
       ok: false,
       error: "decisions_failed",
-      reason: `${DECISIONS_REL}: ${decisionsWrite.error}`,
+      reason: `${DECISION_LOG_PATH}: ${decisionsWrite.error}`,
     };
   }
   filesChanged.push(decisionsWrite.value.path);
@@ -605,11 +617,11 @@ export function runRulesRemove(argv: readonly string[]): ExitCode {
           "category:* and oxlint built-ins → fast).\n" +
           "\n" +
           "--reason is mandatory (SPEC §6 line 389): rule removal loosens\n" +
-          "enforcement and the rationale is appended to docs/lint-decisions.md\n" +
+          "enforcement and the rationale is appended to .harn/qualy/docs/lint-decisions.md\n" +
           "as an audit trail entry.\n" +
           "\n" +
           "On success, writes the preset and appends a `rule-remove` entry to\n" +
-          "docs/lint-decisions.md. With --dry-run, prints the proposed action\n" +
+          ".harn/qualy/docs/lint-decisions.md. With --dry-run, prints the proposed action\n" +
           "without writing (and without requiring --reason).\n" +
           "\n" +
           "Exit codes: 0 ok, 1 preset/decisions/unknown-rule/missing-reason,\n" +

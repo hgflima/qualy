@@ -23,7 +23,7 @@
  *   - `user-override:<date>`    — out of scope for v1 (the project doesn't
  *                                 distinguish user edits in the preset JSON
  *                                 itself; `rules-add`/`rules-remove` will tag
- *                                 entries via `docs/lint-decisions.md`).
+ *                                 entries via `.harn/qualy/docs/lint-decisions.md`).
  *
  * Output (PLAN §Contratos CLI shape):
  *   { ok, cwd, stage, active, disabled, available }

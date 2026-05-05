@@ -1,9 +1,9 @@
 /**
  * `recs-apply` — applies a single recommendation from `.lint-audit/<ts>.json`
- * to the project and appends an entry to `docs/lint-decisions.md`.
+ * to the project and appends an entry to `.harn/qualy/docs/lint-decisions.md`.
  *
  * Contract: SPEC §7.6 acceptance + §6 Always ("registrar add/remove de rules
- * em docs/lint-decisions.md com motivo capturado do usuário"); PLAN §Contratos
+ * em .harn/qualy/docs/lint-decisions.md com motivo capturado do usuário"); PLAN §Contratos
  * CLI line 79 (`recs-apply --rec-id <id> --audit <path>` → `{ files_changed }`).
  *
  * Per ADR 0008 the canonical input is `audit.recommendations[]` (the enriched
@@ -71,6 +71,11 @@ import {
   ENTRIES_START,
   loadOrInitDecisions,
 } from "../../lib/decision-log.ts";
+import {
+  migrateDecisionLogIfNeeded,
+  type DecisionLogMigrationDeps,
+} from "../../lib/decision-log-migration.ts";
+import { DECISION_LOG_PATH } from "../../lib/paths.ts";
 
 import { auditLatest } from "../audit-latest.ts";
 
@@ -104,7 +109,6 @@ const KIND_BY_TYPE: Readonly<Record<Recommendation["type"], string>> = {
   "fix-tooling": "rec-apply",
 };
 
-export const DECISIONS_REL = "docs/lint-decisions.md";
 const DECISIONS_TEMPLATE = join(
   dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -174,6 +178,9 @@ export interface RecsApplyDeps {
   readonly templatePath?: string;
   /** Defense-in-depth dirty check; mirrors `safeWriteFile`'s strict path. */
   readonly dirtyFilesFn?: (cwd: string) => { ok: true; value: readonly string[] } | { ok: false; error: string };
+  /** Optional override for the one-time decision-log migration helper. Tests
+   *  inject a no-op stub; production uses real fs + git via the default. */
+  readonly migrationDeps?: DecisionLogMigrationDeps;
 }
 
 // ---------------------------------------------------------------------------
@@ -818,7 +825,13 @@ export function recsApply(
   const now = deps.now ? deps.now() : new Date();
   const author = (deps.authorFn ?? defaultAuthor)(opts.cwd);
   const templatePath = deps.templatePath ?? DECISIONS_TEMPLATE;
-  const decisionsAbs = join(opts.cwd, DECISIONS_REL);
+
+  const migration = migrateDecisionLogIfNeeded(opts.cwd, deps.migrationDeps);
+  if (!migration.ok) {
+    return { ok: false, error: migration.error, reason: migration.reason };
+  }
+
+  const decisionsAbs = join(opts.cwd, DECISION_LOG_PATH);
   const readFileFn = deps.readFileFn ?? defaultRead;
   const decisionsRaw = readFileFn(decisionsAbs);
   const loaded = loadOrInitDecisions(decisionsRaw, templatePath, readFileFn);
@@ -840,7 +853,7 @@ export function recsApply(
   }
   const decisionsWrite = safeWriteFile(
     opts.cwd,
-    DECISIONS_REL,
+    DECISION_LOG_PATH,
     appended.text,
     { kind: "decisions", merged: decisionsRaw !== null },
     deps.safeIO,
@@ -849,7 +862,7 @@ export function recsApply(
     return {
       ok: false,
       error: "decisions_failed",
-      reason: `${DECISIONS_REL}: ${decisionsWrite.error}`,
+      reason: `${DECISION_LOG_PATH}: ${decisionsWrite.error}`,
     };
   }
   filesChanged.push(decisionsWrite.value.path);
@@ -1025,7 +1038,7 @@ export function runRecsApply(argv: readonly string[]): ExitCode {
           "\n" +
           "Loosening changes (lower-threshold, remove-rule, loosen-coverage)\n" +
           "REQUIRE --reason (SPEC §6). Every successful apply appends an entry to\n" +
-          "docs/lint-decisions.md between the qualy:entries-start/end markers.\n" +
+          ".harn/qualy/docs/lint-decisions.md between the qualy:entries-start/end markers.\n" +
           "\n" +
           "Exit codes: 0 ok, 1 audit/preset/coverage/decisions failure,\n" +
           "  3 dirty tree under --strict, 4 usage.\n",

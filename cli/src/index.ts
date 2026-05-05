@@ -97,7 +97,7 @@ const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> =
   ["audit-latest", "Read the most recent .lint-audit/*.json"],
   ["recs-generate", "Deterministic heuristics → candidates[] (rationale_stub only)"],
   ["recs-blast-radius", "Dry-run a rec's config and count newly/no-longer-violating files"],
-  ["recs-apply", "Apply a rec patch + append decision to docs/lint-decisions.md"],
+  ["recs-apply", "Apply a rec patch + append decision to .harn/qualy/docs/lint-decisions.md"],
   ["rules-list", "List active, available, and disabled rules with their origin"],
   ["rules-add", "Enable a rule (severity/threshold) and log decision"],
   ["rules-remove", "Disable a rule (--reason required) and log decision"],

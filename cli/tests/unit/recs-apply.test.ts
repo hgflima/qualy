@@ -583,7 +583,7 @@ describe("recsApply — oxlint preset edits", () => {
     if (!r.ok || !r.applied) return;
     expect(r.kind).toBe("threshold-lower");
     expect(r.files_changed).toContain("oxlint.deep.json");
-    expect(r.files_changed).toContain("docs/lint-decisions.md");
+    expect(r.files_changed).toContain(".harn/qualy/docs/lint-decisions.md");
 
     const presetWrite = writes.get(`${ROOT}/oxlint.deep.json`);
     expect(presetWrite).toBeDefined();
@@ -591,7 +591,7 @@ describe("recsApply — oxlint preset edits", () => {
     expect(presetJson.rules["quality-metrics/wmc"]).toEqual(["error", { max: 28 }]);
     expect(presetJson.rules["quality-metrics/cbo"]).toEqual(["error", { max: 10 }]);
 
-    const decisions = files.get(`${ROOT}/docs/lint-decisions.md`);
+    const decisions = files.get(`${ROOT}/.harn/qualy/docs/lint-decisions.md`);
     expect(decisions).toContain("- **kind**: threshold-lower");
     expect(decisions).toContain("- **rule**: quality-metrics/wmc");
     expect(decisions).toContain("- **reason**: muitas violações");
@@ -637,7 +637,7 @@ describe("recsApply — oxlint preset edits", () => {
     if (!r.ok || !r.applied) return;
     const presetJson = JSON.parse(writes.get(`${ROOT}/oxlint.deep.json`) as string);
     expect("quality-metrics/dit" in presetJson.rules).toBe(false);
-    const decisions = files.get(`${ROOT}/docs/lint-decisions.md`);
+    const decisions = files.get(`${ROOT}/.harn/qualy/docs/lint-decisions.md`);
     expect(decisions).toContain("- **kind**: rule-remove");
     expect(decisions).toContain("- **reason**: rule muito ruidosa");
   });
@@ -700,7 +700,7 @@ describe("recsApply — coverage edits", () => {
     const updated = writes.get(`${ROOT}/vitest.config.ts`) ?? "";
     expect(updated).toContain("lines: 58");
     expect(updated).toContain("functions: 70"); // siblings preserved
-    const decisions = files.get(`${ROOT}/docs/lint-decisions.md`);
+    const decisions = files.get(`${ROOT}/.harn/qualy/docs/lint-decisions.md`);
     expect(decisions).toContain("- **kind**: coverage-lower");
     expect(decisions).toContain("- **reason**: rebaseline pós migração");
   });
@@ -763,10 +763,10 @@ describe("recsApply — decisions log behaviour", () => {
     const { deps, files } = fakeDeps({
       files: { [`${ROOT}/oxlint.deep.json`]: DEEP_PRESET },
     });
-    expect(files.has(`${ROOT}/docs/lint-decisions.md`)).toBe(false);
+    expect(files.has(`${ROOT}/.harn/qualy/docs/lint-decisions.md`)).toBe(false);
     const r = recsApply({ cwd: ROOT, audit, recId: "rec-002" }, deps);
     expect(r.ok).toBe(true);
-    const decisions = files.get(`${ROOT}/docs/lint-decisions.md`);
+    const decisions = files.get(`${ROOT}/.harn/qualy/docs/lint-decisions.md`);
     expect(decisions).toBeDefined();
     expect(decisions).toContain(ENTRIES_START);
     expect(decisions).toContain(ENTRIES_END);
@@ -809,7 +809,7 @@ describe("recsApply — decisions log behaviour", () => {
     const { deps } = fakeDeps({
       files: {
         [`${ROOT}/oxlint.deep.json`]: DEEP_PRESET,
-        [`${ROOT}/docs/lint-decisions.md`]: broken,
+        [`${ROOT}/.harn/qualy/docs/lint-decisions.md`]: broken,
       },
     });
     const r = recsApply({ cwd: ROOT, audit, recId: "rec-002" }, deps);
