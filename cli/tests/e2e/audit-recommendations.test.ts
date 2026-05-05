@@ -56,6 +56,12 @@ import { materializeFixture } from "../fixtures/_materialize.ts";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXED_DATE = new Date("2026-05-03T14:22:11.000Z");
 
+// Fixtures are tmp dirs without `node_modules/`; `installOxlint` patches the
+// deep preset's `jsPlugins[]` via `require.resolve` (ADR 0012). Without a stub
+// it returns `quality_metrics_missing`. Same shape as the unit-test stub.
+const resolveModuleStub = (id: string, paths: readonly string[]): string =>
+  join(paths[0]!, "node_modules", id, "dist", "index.js");
+
 interface StubDiagnostic {
   readonly severity: "error" | "warning";
   readonly filename: string;
@@ -158,7 +164,10 @@ describe("e2e: SPEC §7.5 audit JSON contract + §7.6 rationale enrichment", () 
     cleanups.push(fx.cleanup);
 
     // Install oxlint presets first — without them, audit returns preset_missing.
-    const ox = installOxlint({ cwd: fx.dir, stage: "greenfield" });
+    const ox = installOxlint(
+      { cwd: fx.dir, stage: "greenfield" },
+      { resolveModule: resolveModuleStub },
+    );
     expect(ox.ok, JSON.stringify(ox)).toBe(true);
 
     // Run pure `audit()` with stubbed runner that emits 5 error-level wmc
@@ -230,7 +239,10 @@ describe("e2e: SPEC §7.5 audit JSON contract + §7.6 rationale enrichment", () 
     const fx = materializeFixture("greenfield-ts");
     cleanups.push(fx.cleanup);
 
-    const ox = installOxlint({ cwd: fx.dir, stage: "greenfield" });
+    const ox = installOxlint(
+      { cwd: fx.dir, stage: "greenfield" },
+      { resolveModule: resolveModuleStub },
+    );
     expect(ox.ok).toBe(true);
 
     const auditRes = audit(

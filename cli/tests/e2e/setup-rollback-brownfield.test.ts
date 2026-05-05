@@ -63,6 +63,13 @@ import { materializeFixture } from "../fixtures/_materialize.ts";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PRESETS_OXLINT_DIR = join(HERE, "..", "..", "src", "presets", "oxlint");
 
+// `installDeps.runFn` is stubbed (see file header), so `quality-metrics` never
+// lands in the fixture's `node_modules/`. `installOxlint` patches the deep
+// preset's `jsPlugins[]` via `require.resolve` (ADR 0012); without a stub it
+// throws `quality_metrics_missing`. Mirror the unit-test stub shape.
+const resolveModuleStub = (id: string, paths: readonly string[]): string =>
+  join(paths[0]!, "node_modules", id, "dist", "index.js");
+
 interface PackageJsonRoot {
   readonly scripts?: Record<string, string>;
   readonly type?: string;
@@ -142,37 +149,50 @@ describe("e2e: /lint:setup + /lint:rollback on fixtures/brownfield-eslint-pretti
     expect([...depsRes.installed].sort()).toEqual([...DEFAULT_DEPS].sort());
 
     // ── Step 3: install-oxlint --stage brownfield-moderate ────────────────
-    const oxlintRes = installOxlint({ cwd: fx.dir, stage: "brownfield-moderate" });
+    const oxlintRes = installOxlint(
+      { cwd: fx.dir, stage: "brownfield-moderate" },
+      { resolveModule: resolveModuleStub },
+    );
     expect(oxlintRes.ok, JSON.stringify(oxlintRes)).toBe(true);
     if (!oxlintRes.ok) return;
     expect(oxlintRes.stage).toBe("brownfield-moderate");
     expect(oxlintRes.stageSource).toBe("explicit");
     expect(oxlintRes.written).toHaveLength(2);
 
-    // Both presets land byte-for-byte from the BROWNFIELD source — drift here
-    // (e.g. install-oxlint accidentally picking the greenfield preset) breaks
-    // SPEC §7.2 acceptance.
+    // Fast preset has no `jsPlugins` → byte-for-byte from the bundle. (Both
+    // brownfield-moderate.fast.json and greenfield.fast.json are byte-identical
+    // by design — they only carry `categories` — so stage drift is detected on
+    // the deep preset below, which is where stage-specific thresholds live.)
     const fastWritten = readFileSync(join(fx.dir, "oxlint.fast.json"), "utf8");
     const fastSource = readFileSync(
       join(PRESETS_OXLINT_DIR, "brownfield-moderate.fast.json"),
       "utf8",
     );
     expect(fastWritten).toBe(fastSource);
-    expect(fastWritten).toContain("stage=brownfield-moderate");
-    // Sanity: we did NOT install the greenfield preset.
-    const greenfieldFastSource = readFileSync(
-      join(PRESETS_OXLINT_DIR, "greenfield.fast.json"),
-      "utf8",
-    );
-    expect(fastWritten).not.toBe(greenfieldFastSource);
 
+    // Deep preset is patched at write-time (ADR 0012): structural compare
+    // ignoring `jsPlugins`, then assert the patched path explicitly. Drift to
+    // the wrong stage (e.g. install-oxlint picking greenfield) shows up here
+    // because thresholds (wmc.max, halstead.maxVolume, ...) differ per stage.
     const deepWritten = readFileSync(join(fx.dir, "oxlint.deep.json"), "utf8");
     const deepSource = readFileSync(
       join(PRESETS_OXLINT_DIR, "brownfield-moderate.deep.json"),
       "utf8",
     );
-    expect(deepWritten).toBe(deepSource);
-    expect(deepWritten).toContain("stage=brownfield-moderate");
+    const deepWrittenParsed = JSON.parse(deepWritten) as { jsPlugins?: unknown };
+    const deepSourceParsed = JSON.parse(deepSource) as { jsPlugins?: unknown };
+    expect(deepWrittenParsed.jsPlugins).toEqual([
+      resolveModuleStub("quality-metrics", [fx.dir]),
+    ]);
+    delete deepWrittenParsed.jsPlugins;
+    delete deepSourceParsed.jsPlugins;
+    expect(deepWrittenParsed).toEqual(deepSourceParsed);
+    // Sanity: brownfield rules are stricter-than-legacy/looser-than-greenfield.
+    const greenfieldDeepSource = readFileSync(
+      join(PRESETS_OXLINT_DIR, "greenfield.deep.json"),
+      "utf8",
+    );
+    expect(JSON.parse(greenfieldDeepSource)).not.toEqual(deepSourceParsed);
 
     // ── Step 4: install-hook ──────────────────────────────────────────────
     const hookRes = installHook({ cwd: fx.dir });

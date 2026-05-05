@@ -82,6 +82,12 @@ import { materializeFixture } from "../fixtures/_materialize.ts";
 
 const FIXED_DATE = new Date("2026-05-04T12:00:00.000Z");
 
+// Fixtures are tmp dirs without `node_modules/`; `installOxlint` patches the
+// deep preset's `jsPlugins[]` via `require.resolve` (ADR 0012). Without a stub
+// it returns `quality_metrics_missing`. Same shape as the unit-test stub.
+const resolveModuleStub = (id: string, paths: readonly string[]): string =>
+  join(paths[0]!, "node_modules", id, "dist", "index.js");
+
 interface StubDiagnostic {
   readonly severity: "error" | "warning";
   readonly filename: string;
@@ -146,7 +152,10 @@ describe("e2e: SPEC §7.7 #4 — exported HTML opens offline and renders identic
       const fx = materializeFixture("greenfield-ts");
       cleanups.push(fx.cleanup);
 
-      const ox = installOxlint({ cwd: fx.dir, stage: "greenfield" });
+      const ox = installOxlint(
+        { cwd: fx.dir, stage: "greenfield" },
+        { resolveModule: resolveModuleStub },
+      );
       expect(ox.ok, JSON.stringify(ox)).toBe(true);
 
       // ── Step 2: write a real .lint-audit/<ts>.json via audit() ──────────
@@ -353,7 +362,12 @@ describe("e2e: SPEC §7.7 #4 — exported HTML opens offline and renders identic
     const fx = materializeFixture("greenfield-ts");
     cleanups.push(fx.cleanup);
 
-    expect(installOxlint({ cwd: fx.dir, stage: "greenfield" }).ok).toBe(true);
+    expect(
+      installOxlint(
+        { cwd: fx.dir, stage: "greenfield" },
+        { resolveModule: resolveModuleStub },
+      ).ok,
+    ).toBe(true);
 
     const auditRes = audit(
       { cwd: fx.dir },

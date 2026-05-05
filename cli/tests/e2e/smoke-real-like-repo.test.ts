@@ -57,6 +57,13 @@ const PRESETS_OXLINT_DIR = join(HERE, "..", "..", "src", "presets", "oxlint");
 const TEMPLATE_LINTSTAGED = join(HERE, "..", "..", "src", "templates", "lintstagedrc.example.js");
 
 const COMMIT_DATE = "2026-04-15T12:00:00Z";
+
+// `installDeps.runFn` is stubbed below, so `quality-metrics` is never on disk.
+// `installOxlint` patches the deep preset's `jsPlugins[]` via `require.resolve`
+// (ADR 0012) — without a stub it returns `quality_metrics_missing`. Mirror the
+// shape of the unit-test stub.
+const resolveModuleStub = (id: string, paths: readonly string[]): string =>
+  join(paths[0]!, "node_modules", id, "dist", "index.js");
 const AUTHOR = "smoke";
 const EMAIL = "smoke@qualy.local";
 
@@ -326,7 +333,10 @@ describe("smoke: /lint:setup against a dynamically synthesized real-like TS repo
     expect([...depsRes.installed].sort()).toEqual([...DEFAULT_DEPS].sort());
 
     // ── Layer 2: install-oxlint (use greenfield preset for determinism) ───
-    const oxlintRes = installOxlint({ cwd: repo.dir, stage: "greenfield" });
+    const oxlintRes = installOxlint(
+      { cwd: repo.dir, stage: "greenfield" },
+      { resolveModule: resolveModuleStub },
+    );
     expect(oxlintRes.ok, JSON.stringify(oxlintRes)).toBe(true);
     if (!oxlintRes.ok) return;
     expect(oxlintRes.written).toHaveLength(2);

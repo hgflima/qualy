@@ -46,6 +46,14 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const PRESETS_OXLINT_DIR = join(HERE, "..", "..", "src", "presets", "oxlint");
 const TEMPLATE_LINTSTAGED = join(HERE, "..", "..", "src", "templates", "lintstagedrc.example.js");
 
+// Fixture is a fresh tmp dir without `node_modules/`, so `installDeps` is
+// stubbed and the bare-specifier resolution that `installOxlint` performs to
+// patch `jsPlugins[]` (ADR 0012) cannot reach a real `quality-metrics`. Inject
+// a deterministic absolute path that mirrors what an actual install would
+// expose — same shape as the unit-test stub in `install-oxlint.test.ts`.
+const resolveModuleStub = (id: string, paths: readonly string[]): string =>
+  join(paths[0]!, "node_modules", id, "dist", "index.js");
+
 interface SettingsHookEntry {
   readonly matcher?: string;
   readonly hooks?: readonly { readonly type?: string; readonly command?: string }[];
@@ -90,21 +98,34 @@ describe("e2e: /lint:setup on fixtures/greenfield-ts/", () => {
     expect(depsRes.recorded).toBe(DEFAULT_DEPS.length);
 
     // ── Layer 2: install-oxlint --stage greenfield ────────────────────────
-    const oxlintRes = installOxlint({ cwd: fx.dir, stage: "greenfield" });
+    const oxlintRes = installOxlint(
+      { cwd: fx.dir, stage: "greenfield" },
+      { resolveModule: resolveModuleStub },
+    );
     expect(oxlintRes.ok, JSON.stringify(oxlintRes)).toBe(true);
     if (!oxlintRes.ok) return;
     expect(oxlintRes.stage).toBe("greenfield");
     expect(oxlintRes.stageSource).toBe("explicit");
     expect(oxlintRes.written).toHaveLength(2);
 
-    // Both presets land byte-for-byte from the bundled source.
+    // Fast preset has no `jsPlugins` → bytes are byte-for-byte from the bundle.
     const fastWritten = readFileSync(join(fx.dir, "oxlint.fast.json"), "utf8");
     const fastSource = readFileSync(join(PRESETS_OXLINT_DIR, "greenfield.fast.json"), "utf8");
     expect(fastWritten).toBe(fastSource);
 
+    // Deep preset is patched at write-time (ADR 0012): `jsPlugins[0]` becomes
+    // the absolute resolved path. Compare the rest of the structure against
+    // the bundled source, then assert the patched path explicitly.
     const deepWritten = readFileSync(join(fx.dir, "oxlint.deep.json"), "utf8");
     const deepSource = readFileSync(join(PRESETS_OXLINT_DIR, "greenfield.deep.json"), "utf8");
-    expect(deepWritten).toBe(deepSource);
+    const deepWrittenParsed = JSON.parse(deepWritten) as { jsPlugins?: unknown };
+    const deepSourceParsed = JSON.parse(deepSource) as { jsPlugins?: unknown };
+    expect(deepWrittenParsed.jsPlugins).toEqual([
+      resolveModuleStub("quality-metrics", [fx.dir]),
+    ]);
+    delete deepWrittenParsed.jsPlugins;
+    delete deepSourceParsed.jsPlugins;
+    expect(deepWrittenParsed).toEqual(deepSourceParsed);
 
     // ── Layer 3: install-hook ─────────────────────────────────────────────
     const hookRes = installHook({ cwd: fx.dir });
@@ -240,7 +261,10 @@ describe("e2e: /lint:setup on fixtures/greenfield-ts/", () => {
     expect(byPath.has(MANIFEST_FILENAME)).toBe(false);
 
     // ── Idempotency: re-running every layer is a no-op ────────────────────
-    const oxlintAgain = installOxlint({ cwd: fx.dir, stage: "greenfield" });
+    const oxlintAgain = installOxlint(
+      { cwd: fx.dir, stage: "greenfield" },
+      { resolveModule: resolveModuleStub },
+    );
     expect(oxlintAgain.ok).toBe(true);
     if (oxlintAgain.ok) {
       // bytes are unchanged; the writer still records, but the file content
