@@ -34,7 +34,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { EXIT_CODES, type ExitCode } from "../../lib/exit-codes.ts";
-import { type SafeIO, safeWriteFile } from "../../lib/fs-safe.ts";
+import { type SafeIO, safeWriteFile, setManifestField } from "../../lib/fs-safe.ts";
 import { logger, output } from "../../lib/logger.ts";
 import { type Stage, detectStage } from "../detect-stage.ts";
 
@@ -157,6 +157,8 @@ export function installOxlint(
       recorded: writeRes.value.recorded,
     });
   }
+
+  setManifestField(opts.cwd, { stage }, deps.safeIO);
 
   return { ok: true, cwd: opts.cwd, stage, stageSource, written };
 }

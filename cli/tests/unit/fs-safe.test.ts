@@ -295,6 +295,54 @@ describe("loadManifest", () => {
     const io = memoryIO({ [manifestPath(ROOT)]: stringifyPretty(raw) });
     expect(loadManifest(ROOT, io)?.theme).toBeUndefined();
   });
+
+  it("preserves the stage field when a known stage string", () => {
+    const raw: Manifest = {
+      version: MANIFEST_VERSION,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+      stage: "greenfield",
+      entries: [],
+    };
+    const io = memoryIO({ [manifestPath(ROOT)]: stringifyPretty(raw) });
+    expect(loadManifest(ROOT, io)?.stage).toBe("greenfield");
+  });
+
+  it("preserves stage=brownfield-moderate", () => {
+    const raw: Manifest = {
+      version: MANIFEST_VERSION,
+      created_at: "x",
+      updated_at: "x",
+      stage: "brownfield-moderate",
+      entries: [],
+    };
+    const io = memoryIO({ [manifestPath(ROOT)]: stringifyPretty(raw) });
+    expect(loadManifest(ROOT, io)?.stage).toBe("brownfield-moderate");
+  });
+
+  it("ignores non-string stage", () => {
+    const raw = {
+      version: MANIFEST_VERSION,
+      created_at: "x",
+      updated_at: "x",
+      stage: 42,
+      entries: [],
+    };
+    const io = memoryIO({ [manifestPath(ROOT)]: stringifyPretty(raw) });
+    expect(loadManifest(ROOT, io)?.stage).toBeUndefined();
+  });
+
+  it("ignores unknown stage values", () => {
+    const raw = {
+      version: MANIFEST_VERSION,
+      created_at: "x",
+      updated_at: "x",
+      stage: "experimental",
+      entries: [],
+    };
+    const io = memoryIO({ [manifestPath(ROOT)]: stringifyPretty(raw) });
+    expect(loadManifest(ROOT, io)?.stage).toBeUndefined();
+  });
 });
 
 describe("removeEntry / setManifestField / deleteManifest", () => {
@@ -335,6 +383,24 @@ describe("removeEntry / setManifestField / deleteManifest", () => {
     const m = loadManifest(ROOT, io);
     expect(m?.theme).toBe("linear-design-md");
     expect(m?.entries).toHaveLength(1);
+  });
+
+  it("setManifestField writes stage and preserves theme + entries", () => {
+    const io = memoryIO();
+    safeWriteFile(ROOT, "a.json", "{}", { kind: "preset" }, io);
+    setManifestField(ROOT, { theme: "linear-design-md" }, io);
+    setManifestField(ROOT, { stage: "greenfield" }, io);
+    const m = loadManifest(ROOT, io);
+    expect(m?.stage).toBe("greenfield");
+    expect(m?.theme).toBe("linear-design-md");
+    expect(m?.entries).toHaveLength(1);
+  });
+
+  it("setManifestField overwrites stage on subsequent calls", () => {
+    const io = memoryIO();
+    setManifestField(ROOT, { stage: "greenfield" }, io);
+    setManifestField(ROOT, { stage: "legacy" }, io);
+    expect(loadManifest(ROOT, io)?.stage).toBe("legacy");
   });
 
   it("deleteManifest removes the file and is idempotent", () => {

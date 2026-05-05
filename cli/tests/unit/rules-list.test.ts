@@ -88,10 +88,21 @@ function legacyDeepPreset(): string {
   });
 }
 
+function manifestWithStage(stage: string): string {
+  return JSON.stringify({
+    version: "1",
+    created_at: "2026-01-01T00:00:00.000Z",
+    updated_at: "2026-01-01T00:00:00.000Z",
+    stage,
+    entries: [],
+  });
+}
+
 describe("rulesList — happy path", () => {
-  it("returns ok with stage detected from _comment", () => {
+  it("returns ok with stage read from manifest", () => {
     const fs: FakeFS = {
       files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("greenfield"),
         [pathJoin(ROOT, "oxlint.deep.json")]: greenfieldDeepPreset(),
       },
     };
@@ -101,9 +112,40 @@ describe("rulesList — happy path", () => {
     expect(r.stage).toBe("greenfield");
   });
 
+  it("returns stage=null when no manifest is present", () => {
+    const fs: FakeFS = {
+      files: {
+        [pathJoin(ROOT, "oxlint.deep.json")]: greenfieldDeepPreset(),
+      },
+    };
+    const r = rulesList({ cwd: ROOT }, fsDeps(fs));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.stage).toBeNull();
+  });
+
+  it("returns stage=null when manifest lacks stage field", () => {
+    const fs: FakeFS = {
+      files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: JSON.stringify({
+          version: "1",
+          created_at: "x",
+          updated_at: "x",
+          entries: [],
+        }),
+        [pathJoin(ROOT, "oxlint.deep.json")]: greenfieldDeepPreset(),
+      },
+    };
+    const r = rulesList({ cwd: ROOT }, fsDeps(fs));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.stage).toBeNull();
+  });
+
   it("classifies severity error|warn as active", () => {
     const fs: FakeFS = {
       files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("greenfield"),
         [pathJoin(ROOT, "oxlint.deep.json")]: greenfieldDeepPreset(),
       },
     };
@@ -128,6 +170,7 @@ describe("rulesList — happy path", () => {
   it("classifies severity off as disabled (not active)", () => {
     const fs: FakeFS = {
       files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("brownfield-moderate"),
         [pathJoin(ROOT, "oxlint.deep.json")]: brownfieldDeepPreset(),
       },
     };
@@ -144,6 +187,7 @@ describe("rulesList — happy path", () => {
   it("merges entries from both fast and deep tiers", () => {
     const fs: FakeFS = {
       files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("brownfield-moderate"),
         [pathJoin(ROOT, "oxlint.fast.json")]: brownfieldFastPreset(),
         [pathJoin(ROOT, "oxlint.deep.json")]: brownfieldDeepPreset(),
       },
@@ -156,7 +200,7 @@ describe("rulesList — happy path", () => {
     expect(origins.has("preset:brownfield-moderate:deep")).toBe(true);
   });
 
-  it("origin lacks stage tag when _comment has no stage=", () => {
+  it("origin lacks stage tag when manifest has no stage", () => {
     const fs: FakeFS = {
       files: {
         [pathJoin(ROOT, "oxlint.deep.json")]: JSON.stringify({
@@ -177,6 +221,7 @@ describe("rulesList — available[] computed from stage baseline", () => {
     // greenfield baseline has 6 quality-metrics rules; preset only has wmc+cbo
     const fs: FakeFS = {
       files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("greenfield"),
         [pathJoin(ROOT, "oxlint.deep.json")]: greenfieldDeepPreset(),
       },
     };
@@ -195,6 +240,7 @@ describe("rulesList — available[] computed from stage baseline", () => {
   it("carries suggested_severity, suggested_max, source from baseline", () => {
     const fs: FakeFS = {
       files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("greenfield"),
         [pathJoin(ROOT, "oxlint.deep.json")]: greenfieldDeepPreset(),
       },
     };
@@ -212,7 +258,6 @@ describe("rulesList — available[] computed from stage baseline", () => {
 
   it("excludes rules that are explicitly disabled (severity off)", () => {
     const preset = JSON.stringify({
-      _comment: "stage=greenfield · tier=deep",
       categories: { correctness: "error" },
       rules: {
         "quality-metrics/wmc": "off",
@@ -220,6 +265,7 @@ describe("rulesList — available[] computed from stage baseline", () => {
     });
     const fs: FakeFS = {
       files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("greenfield"),
         [pathJoin(ROOT, "oxlint.deep.json")]: preset,
       },
     };
@@ -232,11 +278,11 @@ describe("rulesList — available[] computed from stage baseline", () => {
 
   it("returns full baseline when project preset has no quality-metrics rules", () => {
     const preset = JSON.stringify({
-      _comment: "stage=legacy · tier=deep",
       categories: { correctness: "warn" },
     });
     const fs: FakeFS = {
       files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("legacy"),
         [pathJoin(ROOT, "oxlint.deep.json")]: preset,
       },
     };
@@ -265,6 +311,7 @@ describe("rulesList — available[] computed from stage baseline", () => {
   it("brownfield-moderate baseline is a complete superset of preset", () => {
     const fs: FakeFS = {
       files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("brownfield-moderate"),
         [pathJoin(ROOT, "oxlint.deep.json")]: brownfieldDeepPreset(),
       },
     };
@@ -314,6 +361,7 @@ describe("rulesList — error paths", () => {
   it("succeeds when one preset is malformed but the other is valid", () => {
     const fs: FakeFS = {
       files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("legacy"),
         [pathJoin(ROOT, "oxlint.fast.json")]: "{ broken",
         [pathJoin(ROOT, "oxlint.deep.json")]: legacyDeepPreset(),
       },

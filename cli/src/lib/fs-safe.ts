@@ -76,12 +76,27 @@ export interface ManifestEntry {
   readonly merged?: boolean;
 }
 
+/**
+ * Stage classification persisted by `install-oxlint`. Used by `rules-list`
+ * (and future readers) to attribute origin tags without parsing the preset
+ * `_comment` (which oxlint 1.62.0 rejects — see ADR 0011).
+ */
+export type ManifestStage = "greenfield" | "brownfield-moderate" | "legacy";
+
+const KNOWN_STAGES: readonly ManifestStage[] = [
+  "greenfield",
+  "brownfield-moderate",
+  "legacy",
+];
+
 export interface Manifest {
   readonly version: typeof MANIFEST_VERSION;
   readonly created_at: string;
   readonly updated_at: string;
   /** Persisted theme choice (read by `status`). Phase 6 will extend the field set. */
   readonly theme?: string;
+  /** Stage tag written by `install-oxlint` so readers don't depend on `_comment`. */
+  readonly stage?: ManifestStage;
   readonly entries: readonly ManifestEntry[];
 }
 
@@ -257,12 +272,17 @@ export function loadManifest(cwd: string, io: SafeIO = {}): Manifest | null {
   const created_at = typeof v.created_at === "string" ? v.created_at : new Date(0).toISOString();
   const updated_at = typeof v.updated_at === "string" ? v.updated_at : created_at;
   const theme = typeof v.theme === "string" && v.theme.length > 0 ? v.theme : undefined;
+  const stage =
+    typeof v.stage === "string" && (KNOWN_STAGES as readonly string[]).includes(v.stage)
+      ? (v.stage as ManifestStage)
+      : undefined;
 
   return {
     version: MANIFEST_VERSION,
     created_at,
     updated_at,
     ...(theme !== undefined ? { theme } : {}),
+    ...(stage !== undefined ? { stage } : {}),
     entries,
   };
 }
@@ -303,12 +323,12 @@ export function removeEntry(cwd: string, posixRelPath: string, io: SafeIO = {}):
 }
 
 /**
- * Patches top-level manifest fields (currently only `theme`). Creates the
- * manifest if it does not exist yet.
+ * Patches top-level manifest fields (`theme`, `stage`). Creates the manifest
+ * if it does not exist yet.
  */
 export function setManifestField(
   cwd: string,
-  patch: { theme?: string },
+  patch: { theme?: string; stage?: ManifestStage },
   io: SafeIO = {},
 ): void {
   const now = io.now ? io.now() : new Date();
@@ -316,6 +336,7 @@ export function setManifestField(
   const next: Manifest = {
     ...cur,
     ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
+    ...(patch.stage !== undefined ? { stage: patch.stage } : {}),
     updated_at: now.toISOString(),
   };
   writeManifest(cwd, next, io);

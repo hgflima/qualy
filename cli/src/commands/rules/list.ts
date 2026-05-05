@@ -43,6 +43,7 @@ import {
   type Stage,
 } from "../../lib/audit-schema.ts";
 import { EXIT_CODES, type ExitCode } from "../../lib/exit-codes.ts";
+import { loadManifest } from "../../lib/fs-safe.ts";
 import { parseDefensive } from "../../lib/json.ts";
 import { logger, output } from "../../lib/logger.ts";
 
@@ -133,7 +134,6 @@ const PRESET_FILES = {
 type Tier = keyof typeof PRESET_FILES;
 
 interface PresetShape {
-  readonly _comment?: unknown;
   readonly categories?: unknown;
   readonly rules?: unknown;
 }
@@ -142,19 +142,14 @@ function isSeverity(s: unknown): s is RuleSeverity {
   return s === "error" || s === "warn" || s === "off";
 }
 
-function readStageFromComment(raw: unknown): Stage | null {
-  if (typeof raw !== "string") return null;
-  const m = raw.match(/stage=([a-z-]+)/i);
-  if (!m) return null;
-  const candidate = m[1];
-  if (
-    candidate === "greenfield" ||
-    candidate === "brownfield-moderate" ||
-    candidate === "legacy"
-  ) {
-    return candidate;
-  }
-  return null;
+function readStageFromManifest(
+  cwd: string,
+  existsFn: (p: string) => boolean,
+  readFileFn: (p: string) => string | null,
+): Stage | null {
+  const manifest = loadManifest(cwd, { existsFn, readFileFn });
+  if (!manifest || manifest.stage === undefined) return null;
+  return manifest.stage;
 }
 
 function rulesFromPreset(preset: PresetShape, origin: string): RuleActive[] {
@@ -221,11 +216,11 @@ function readPresets(
   existsFn: (p: string) => boolean,
   readFileFn: (p: string) => string | null,
 ): PresetsReadResult {
+  const stageFromManifest = readStageFromManifest(cwd, existsFn, readFileFn);
   const reads: PresetRead[] = [];
   let anyPresent = false;
   let malformedCount = 0;
   let presentCount = 0;
-  let detectedStage: Stage | null = null;
 
   for (const tier of ["fast", "deep"] as const) {
     const path = join(cwd, PRESET_FILES[tier]);
@@ -247,14 +242,15 @@ function readPresets(
       malformedCount++;
       continue;
     }
-    const stage = readStageFromComment(preset._comment);
-    if (detectedStage === null && stage !== null) detectedStage = stage;
-    const origin = stage !== null ? `preset:${stage}:${tier}` : `preset:${tier}`;
-    reads.push({ tier, stage, entries: rulesFromPreset(preset, origin) });
+    const origin =
+      stageFromManifest !== null
+        ? `preset:${stageFromManifest}:${tier}`
+        : `preset:${tier}`;
+    reads.push({ tier, stage: stageFromManifest, entries: rulesFromPreset(preset, origin) });
   }
 
   return {
-    stage: detectedStage,
+    stage: stageFromManifest,
     reads,
     anyPresent,
     malformedAll: anyPresent && malformedCount === presentCount,

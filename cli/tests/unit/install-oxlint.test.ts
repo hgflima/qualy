@@ -76,6 +76,26 @@ function loadManifestFromMemory(io: { files: Map<string, string> }): Manifest | 
 
 const STAGES = ["greenfield", "brownfield-moderate", "legacy"] as const;
 
+describe("installOxlint — manifest.stage", () => {
+  for (const stage of STAGES) {
+    it(`records stage=${stage} on the manifest after writing presets`, () => {
+      const io = memoryIO();
+      installOxlint({ cwd: ROOT, stage }, { safeIO: io });
+      const manifest = loadManifestFromMemory(io);
+      expect(manifest).not.toBeNull();
+      if (!manifest) return;
+      expect(manifest.stage).toBe(stage);
+    });
+  }
+
+  it("overwrites stage when re-installing for a different stage", () => {
+    const io = memoryIO();
+    installOxlint({ cwd: ROOT, stage: "greenfield" }, { safeIO: io });
+    installOxlint({ cwd: ROOT, stage: "legacy" }, { safeIO: io });
+    expect(loadManifestFromMemory(io)?.stage).toBe("legacy");
+  });
+});
+
 describe("installOxlint — explicit stage", () => {
   for (const stage of STAGES) {
     it(`writes byte-exact fast+deep presets for stage=${stage}`, () => {
