@@ -36,6 +36,11 @@ import { runInstallScripts } from "./commands/install/scripts.ts";
 import { runHarnessInstall } from "./install/install.ts";
 import { runHarnessUninstall } from "./install/uninstall.ts";
 import { runHarnessUpdate } from "./install/update.ts";
+import { runIgnoreAdd } from "./commands/ignore/add.ts";
+import { runIgnoreCompile } from "./commands/ignore/compile.ts";
+import { runIgnoreExplain } from "./commands/ignore/explain.ts";
+import { runIgnoreList } from "./commands/ignore/list.ts";
+import { runIgnoreRemove } from "./commands/ignore/remove.ts";
 import { runRecsApply } from "./commands/recs/apply.ts";
 import { runRecsBlastRadius } from "./commands/recs/blast-radius.ts";
 import { runRecsGenerate } from "./commands/recs/generate.ts";
@@ -102,6 +107,11 @@ const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> =
   ["rules-add", "Enable a rule (severity/threshold) and log decision"],
   ["rules-remove", "Disable a rule (--reason required) and log decision"],
   ["rules-explain", "Explain a rule: description, rationale, threshold, links"],
+  ["ignore-compile", "Compile .harn/qualy/ignore.json into oxlint preset markers"],
+  ["ignore-add", "Add or update an ignore entry (path/rule) and recompile presets"],
+  ["ignore-list", "List ignore entries with status (active/expired) and origin"],
+  ["ignore-remove", "Remove an ignore entry (--reason required) and recompile presets"],
+  ["ignore-explain", "Explain an ignore entry: details + decision-log history"],
   ["status", "Aggregate versions, presets, stage, hooks, coverage, theme"],
   ["report-data", "Aggregate audit + history + coverage + git into report JSON"],
   ["report-serve", "Serve the visual report on 127.0.0.1 (long-running)"],
@@ -141,6 +151,11 @@ const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>
   ["rules-explain", runRulesExplain],
   ["rules-list", runRulesList],
   ["rules-remove", runRulesRemove],
+  ["ignore-add", runIgnoreAdd],
+  ["ignore-compile", runIgnoreCompile],
+  ["ignore-explain", runIgnoreExplain],
+  ["ignore-list", runIgnoreList],
+  ["ignore-remove", runIgnoreRemove],
   ["status", runStatus],
   ["lint-uninstall", runLintUninstall],
   ["report-data", runReportData],

@@ -99,13 +99,12 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Deps: 2.1, 2.2, 2.3, 2.8
   - **Notes (Ralph 2026-05-05):** `--path <glob>` é igualdade literal (não picomatch — sem dependência adicional ainda); slot natural para `fast-glob` quando T4.3 chegar. `explain.history` parser identifica blocos por `- **id**: <id>` bullet; markers ausentes → `[]` (não erro). `--rule path` aceito como sinônimo de `null` em `remove`/`explain` para que slash command sempre passe seletor explícito.
 
-- [ ] **2.6 — Wire dispatch em `index.ts`** · S
-  - 5 entries em `SUBCOMMAND_LIST` (`:78`) e `HANDLER_OVERRIDES` (`:117`): `ignore-compile`, `ignore-add`, `ignore-list`, `ignore-remove`, `ignore-explain`
-  - **Pode ser feita parcialmente** (`ignore-compile` sozinho) logo após T2.3 para desbloquear smoke manual; restante segue T2.4/T2.5. A acceptance final exige os 5 wirados.
-  - Imports em `index.ts`: `runIgnoreCompile` de `./commands/ignore/compile.ts` (existe); demais aguardam T2.4/T2.5.
-  - **Não há `cli/tests/unit/index-help.test.ts` hoje** (verificado 2026-05-05). PLAN.md mencionou "extend" desse teste, mas o arquivo não existe. Opções: (a) criar `cli/tests/unit/index-help.test.ts` com snapshot do `--help` output (snapshot-based vitest test) e popular com os 5 ignore-* entries; ou (b) ficar só com smoke check abaixo. Recomendação: ir com (a) só se outras tasks futuras (T3.4b, T3.5, T4.3) também adicionarem subcomandos — daí compensa. Caso contrário, smoke check basta.
-  - Verify: `node --experimental-strip-types cli/src/index.ts --help | grep ignore-` (5 linhas)
-  - Deps: 2.3 (mínimo para wire de `ignore-compile`); 2.4, 2.5 (para wire completo)
+- [x] **2.6 — Wire dispatch em `index.ts`** · S
+  - 5 entries em `SUBCOMMAND_LIST` e `HANDLER_OVERRIDES`: `ignore-compile`, `ignore-add`, `ignore-list`, `ignore-remove`, `ignore-explain`
+  - Criado `cli/tests/unit/index-help.test.ts` (3 it() blocks) — verifica registro, summaries e que nenhum handler é stub `notImplemented`. Justificado: T3.4b/T3.5/T4.3 adicionarão mais subcomandos.
+  - Snapshot `pack-contents.test.ts.snap` atualizado para incluir `add.ts`, `explain.ts`, `list.ts`, `remove.ts` (eram emitidos no tarball desde T2.4/T2.5 mas o snap não tinha sido refrescado).
+  - Verify: `node --experimental-strip-types cli/src/index.ts --help | grep ignore-` → 5 linhas ✓; `npx vitest run` → 2244 verde ✓; `npm run typecheck` ✓.
+  - Deps: 2.3, 2.4, 2.5 — todos satisfeitos.
 
 - [ ] **2.7 — Slash command `/lint:ignore:add` (path-only)** · S
   - Frontmatter + `AskUserQuestion` flow (glob → reason 4 opções → expires)
@@ -259,4 +258,5 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
 
 ## Blocked (Ralph)
 
+- Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo (stuck after 3 attempts)
 - Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo (stuck after 3 attempts)
