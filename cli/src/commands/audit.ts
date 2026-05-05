@@ -82,7 +82,7 @@ export const AUDIT_DIR = ".lint-audit";
 const TRACKED_PACKAGES = {
   oxlint: "oxlint",
   oxfmt: "oxfmt",
-  quality_metrics: "@oxc-project/quality-metrics",
+  quality_metrics: "quality-metrics",
 } as const;
 
 const PRESET_FILES = {

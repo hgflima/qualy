@@ -108,13 +108,13 @@ describe("status (pure)", () => {
         existsFn: existsFor([
           "node_modules/oxlint/package.json",
           "node_modules/oxfmt/package.json",
-          "node_modules/@oxc-project/quality-metrics/package.json",
+          "node_modules/quality-metrics/package.json",
           "node_modules/vitest/package.json",
         ]),
         readFileFn: readFileFor({
           "node_modules/oxlint/package.json": JSON.stringify({ version: "1.4.0" }),
           "node_modules/oxfmt/package.json": JSON.stringify({ version: "0.9.0" }),
-          "node_modules/@oxc-project/quality-metrics/package.json": JSON.stringify({
+          "node_modules/quality-metrics/package.json": JSON.stringify({
             version: "0.2.1",
           }),
           "node_modules/vitest/package.json": JSON.stringify({ version: "2.0.5" }),

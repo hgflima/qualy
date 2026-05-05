@@ -73,7 +73,7 @@ const DEFAULT_THEME = "linear-design-md";
 const TRACKED_PACKAGES = {
   oxlint: "oxlint",
   oxfmt: "oxfmt",
-  quality_metrics: "@oxc-project/quality-metrics",
+  quality_metrics: "quality-metrics",
   vitest: "vitest",
   jest: "jest",
 } as const;

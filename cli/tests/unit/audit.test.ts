@@ -567,7 +567,6 @@ describe("audit — tooling versions", () => {
         [pathJoin(
           ROOT,
           "node_modules",
-          "@oxc-project",
           "quality-metrics",
           "package.json",
         )]: JSON.stringify({ version: "0.9.1" }),

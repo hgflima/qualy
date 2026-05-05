@@ -14,8 +14,8 @@
 | 1 | T1.3 — `install-oxlint` patches `jsPlugins` w/ absolute path (ADR 0012) | ✅ done | `dad7022` |
 | 2 | T2.1 — collapse halstead pair + fix `lcom` option name | ✅ done | `33f60f1` |
 | 2 | T2.2 — `METRIC_RULE_TO_KEY` + rule lists collapsed to 5 canonical rules | ✅ done | `98b9d46` |
-| 2 | T2.3 — `metricKeyFromRule` aceita `ns/rule` E `ns(rule)` | ✅ done | _(ver TASKS.md tabela de commits)_ |
-| 3 | T3.1 — substituir `@oxc-project/quality-metrics` → `quality-metrics` | ⬜ pending | — |
+| 2 | T2.3 — `metricKeyFromRule` aceita `ns/rule` E `ns(rule)` | ✅ done | `ae9b3dd` |
+| 3 | T3.1 — substituir `@oxc-project/quality-metrics` → `quality-metrics` | ✅ done | _(commit desta sessão — ver TASKS.md)_ |
 | 4 | T4.1 — audit distingue `preset_invalid` de `oxlint_missing` | ⬜ pending | — |
 | 4 | T4.2 — e2e install + audit detecta violação real plantada | ⬜ pending | — |
 
@@ -34,8 +34,8 @@
 - `recs/generate.ts` `pickPresetRule` é agora metric-aware via `METRIC_OPTION_KEY` (lê `maxVolume` para halstead, `maxLcom` para lcom) — sem isso a heurística de raise/lower-threshold para halstead/lcom retornava `null`.
 
 **Pendências para retomar:**
-1. T3.1 — `rg '@oxc-project/quality-metrics' skills/lint/cli/src/` ainda retorna matches em `audit.ts:85`, `status.ts:76`, `recs/generate.ts:251,255,261`. Paralelizável; XS.
-2. T4.1 + T4.2 — Phase 4 (defesa em profundidade). Precisa de T3.1 mergeada antes do e2e fazer sentido.
+1. T4.1 — audit distingue `preset_invalid` de `oxlint_missing` por inspeção de stderr (string-match em âncoras). S; precisa de fixtures de stderr para 4 tipos de falha.
+2. T4.2 — e2e `install + audit detecta violação real plantada` (smoke contra regressão de B1-B6). M; depende de T4.1.
 
 ---
 

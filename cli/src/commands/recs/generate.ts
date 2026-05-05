@@ -268,17 +268,17 @@ function generateFixTooling(audit: AuditPayload): Candidate[] {
     out.push({
       id: "rec-fix-tooling-quality-metrics",
       type: "fix-tooling",
-      title: "@oxc-project/quality-metrics não está instalado — instalar via install-deps",
+      title: "quality-metrics não está instalado — instalar via install-deps",
       rationale_stub:
         "quality-metrics ausente em node_modules/; instalar via install-deps.",
       evidence: {
-        package: "@oxc-project/quality-metrics",
+        package: "quality-metrics",
         installed: false,
         active_rules: activeQualityMetricsCount(audit.rules_active),
       },
       suggested_change: {
         applies_to: "package.json",
-        package: "@oxc-project/quality-metrics",
+        package: "quality-metrics",
       },
       blast_radius: { files_currently_violating: 0, files_newly_violating: null },
       severity: "critical",
