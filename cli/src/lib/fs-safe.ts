@@ -64,6 +64,7 @@ export type ManifestEntryKind =
   | "template"
   | "dep"
   | "backup"
+  | "ignore"
   | "other";
 
 export interface ManifestEntry {
