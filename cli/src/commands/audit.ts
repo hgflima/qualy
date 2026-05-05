@@ -71,6 +71,7 @@ import {
   type StatFn,
   checkDriftAndRecompile,
 } from "../lib/ignore-drift.ts";
+import { findExpired, loadIgnoreManifest } from "../lib/ignore-manifest.ts";
 import { parseDefensive } from "../lib/json.ts";
 import { logger, output } from "../lib/logger.ts";
 import {
@@ -213,6 +214,25 @@ export interface AuditOptions {
   readonly oxlintBin?: string;
 }
 
+/**
+ * One warning per expired ignore entry detected during audit (T4.2).
+ *
+ * SPEC §10 #5: expired exclusions warn-only; they never block the audit. The
+ * `audit` command surfaces these on `AuditOk.ignore_warnings` (consumed by
+ * `/lint:report` and any harness that wants to nag the user about stale
+ * exclusions) AND emits a `logger.warn("ignore_expired", …)` to stderr per
+ * entry so plain CLI users see the drift without parsing JSON.
+ *
+ * The field is intentionally NOT in the persisted `AuditPayload` (audit-schema
+ * is locked at version 1; warnings can be re-derived from the manifest).
+ */
+export interface IgnoreWarning {
+  readonly id: string;
+  readonly glob: string;
+  readonly expires: string;
+  readonly days_overdue: number;
+}
+
 export interface AuditOk {
   readonly ok: true;
   readonly cwd: string;
@@ -222,6 +242,7 @@ export interface AuditOk {
   readonly generated_at: string;
   readonly tier: Tier;
   readonly payload: AuditPayload;
+  readonly ignore_warnings: readonly IgnoreWarning[];
 }
 
 export interface AuditErr {
@@ -273,6 +294,21 @@ function defaultDirtyAdapter(cwd: string): SafeResult<readonly string[]> {
  */
 export function toSafeTimestamp(date: Date): string {
   return date.toISOString().replace(/[:.]/g, "-");
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/** Whole UTC days `expires` is past `now`. Caller has already filtered to
+ *  entries with valid `YYYY-MM-DD` dates strictly before today (via
+ *  `findExpired`). Result is a non-negative integer; 0 = expires today. */
+function daysOverdue(expires: string, now: Date): number {
+  const expiresMs = Date.parse(`${expires}T00:00:00.000Z`);
+  const today = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  return Math.floor((today - expiresMs) / MS_PER_DAY);
 }
 
 function readInstalledVersion(
@@ -778,6 +814,27 @@ export function audit(opts: AuditOptions, deps: AuditDeps = {}): AuditResult {
   const generated_at = now.toISOString();
   const timestamp = opts.timestamp ?? toSafeTimestamp(now);
 
+  // T4.2 — Surface expired ignore entries as warnings. Never blocks the audit
+  // (SPEC §6 Never: "Quebrar build/CI por entrada vencida"). When the manifest
+  // is absent or the load fails, treat warnings as empty — drift check above
+  // would have already surfaced a corrupt manifest as a fatal error.
+  const ignore_warnings: IgnoreWarning[] = [];
+  const manifestLoad = loadIgnoreManifest(cwd, deps.safeIO ?? {});
+  if (manifestLoad.ok && manifestLoad.manifest !== null) {
+    for (const entry of findExpired(manifestLoad.manifest, now)) {
+      if (entry.expires === null) continue;
+      const overdue = daysOverdue(entry.expires, now);
+      const warning: IgnoreWarning = {
+        id: entry.id,
+        glob: entry.glob,
+        expires: entry.expires,
+        days_overdue: overdue,
+      };
+      ignore_warnings.push(warning);
+      logger.warn("ignore_expired", { ...warning });
+    }
+  }
+
   const payloadCandidate: AuditPayload = {
     version: AUDIT_SCHEMA_VERSION,
     generated_at,
@@ -821,6 +878,7 @@ export function audit(opts: AuditOptions, deps: AuditDeps = {}): AuditResult {
     generated_at,
     tier: tier.tier,
     payload: validated.value,
+    ignore_warnings,
   };
 }
 

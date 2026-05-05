@@ -18,8 +18,9 @@
  *   - `--strict` honors the dirty-tree gate before any subprocess runs.
  *   - parseAuditArgs covers every flag combination + error path.
  */
+import { PassThrough } from "node:stream";
 import { sep } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   AUDIT_DIR,
@@ -42,6 +43,8 @@ import {
   MANIFEST_FILENAME,
   type SafeIO,
 } from "../../src/lib/fs-safe.ts";
+import { setLogLevel, setStreams } from "../../src/lib/logger.ts";
+import { IGNORE_MANIFEST_PATH } from "../../src/lib/paths.ts";
 
 const ROOT = sep === "/" ? "/proj" : "C:\\proj";
 
@@ -659,6 +662,183 @@ describe("audit — ignore-drift gate (T4.1)", () => {
     });
     const result = audit({ cwd: ROOT }, deps);
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("audit — expired ignore warnings (T4.2)", () => {
+  // Build the on-disk path for `.harn/qualy/ignore.json` in a way that matches
+  // however `loadIgnoreManifest` joins `cwd` with `IGNORE_MANIFEST_PATH`.
+  const manifestPath = pathJoin(ROOT, ...IGNORE_MANIFEST_PATH.split("/"));
+
+  function manifestFileFor(entries: Array<{
+    id: string;
+    glob: string;
+    rule: string | null;
+    reason: string;
+    expires: string | null;
+    createdAt?: string;
+    createdBy?: "user" | "imported";
+  }>): string {
+    return JSON.stringify({
+      version: 1,
+      entries: entries.map((e) => ({
+        id: e.id,
+        glob: e.glob,
+        rule: e.rule,
+        reason: e.reason,
+        expires: e.expires,
+        createdAt: e.createdAt ?? "2026-01-01T00:00:00.000Z",
+        createdBy: e.createdBy ?? "user",
+      })),
+    });
+  }
+
+  let capturedStderr = "";
+  function captureStderr(): void {
+    const stderr = new PassThrough();
+    const stdout = new PassThrough();
+    capturedStderr = "";
+    stderr.on("data", (chunk) => {
+      capturedStderr += String(chunk);
+    });
+    setLogLevel("warn");
+    setStreams({ stderr, stdout });
+  }
+
+  afterEach(() => {
+    setStreams({ stderr: process.stderr, stdout: process.stdout });
+    setLogLevel("info");
+  });
+
+  it("omits ignore_warnings when manifest is absent", () => {
+    const { deps } = makeDeps({
+      files: { [pathJoin(ROOT, "oxlint.deep.json")]: DEEP_PRESET },
+      runOutput: "[]",
+    });
+    const result = audit({ cwd: ROOT }, deps);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.ignore_warnings).toEqual([]);
+  });
+
+  it("returns empty warnings when no entries are expired", () => {
+    const { deps } = makeDeps({
+      files: {
+        [pathJoin(ROOT, "oxlint.deep.json")]: DEEP_PRESET,
+        [manifestPath]: manifestFileFor([
+          {
+            id: "ign-active1",
+            glob: "src/legacy/**",
+            rule: null,
+            reason: "legacy code",
+            expires: "2099-12-31",
+          },
+          {
+            id: "ign-noexp",
+            glob: "src/generated/**",
+            rule: null,
+            reason: "generated",
+            expires: null,
+          },
+        ]),
+      },
+      runOutput: "[]",
+    });
+    const result = audit({ cwd: ROOT }, deps);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.ignore_warnings).toEqual([]);
+  });
+
+  it("surfaces a warning per expired entry with correct days_overdue", () => {
+    captureStderr();
+    const { deps } = makeDeps({
+      files: {
+        [pathJoin(ROOT, "oxlint.deep.json")]: DEEP_PRESET,
+        [manifestPath]: manifestFileFor([
+          // Expired by 1 day (FIXED_DATE = 2026-05-03).
+          {
+            id: "ign-d1",
+            glob: "src/old/**",
+            rule: null,
+            reason: "stale",
+            expires: "2026-05-02",
+          },
+          // Expired by 32 days.
+          {
+            id: "ign-d32",
+            glob: "src/older/**",
+            rule: "quality-metrics/wmc",
+            reason: "stale wmc",
+            expires: "2026-04-01",
+          },
+          // Active — must not appear in warnings.
+          {
+            id: "ign-active",
+            glob: "src/keep/**",
+            rule: null,
+            reason: "future",
+            expires: "2099-12-31",
+          },
+        ]),
+      },
+      runOutput: "[]",
+    });
+    const result = audit({ cwd: ROOT }, deps);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.ignore_warnings).toHaveLength(2);
+    expect(result.ignore_warnings).toEqual(
+      expect.arrayContaining([
+        {
+          id: "ign-d1",
+          glob: "src/old/**",
+          expires: "2026-05-02",
+          days_overdue: 1,
+        },
+        {
+          id: "ign-d32",
+          glob: "src/older/**",
+          expires: "2026-04-01",
+          days_overdue: 32,
+        },
+      ]),
+    );
+
+    // logger.warn fires once per expired entry; never blocks the audit.
+    const lines = capturedStderr.split("\n").filter((l) => l.length > 0);
+    const warnings = lines
+      .map((l) => JSON.parse(l) as Record<string, unknown>)
+      .filter((rec) => rec["event"] === "ignore_expired");
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toMatchObject({
+      level: "warn",
+      event: "ignore_expired",
+      days_overdue: expect.any(Number),
+    });
+  });
+
+  it("expired warnings never block audit ok status", () => {
+    const { deps } = makeDeps({
+      files: {
+        [pathJoin(ROOT, "oxlint.deep.json")]: DEEP_PRESET,
+        [manifestPath]: manifestFileFor([
+          {
+            id: "ign-old",
+            glob: "src/dead/**",
+            rule: null,
+            reason: "old",
+            expires: "2020-01-01",
+          },
+        ]),
+      },
+      runOutput: "[]",
+    });
+    const result = audit({ cwd: ROOT }, deps);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.ignore_warnings).toHaveLength(1);
+    expect(result.ignore_warnings[0].days_overdue).toBeGreaterThan(0);
   });
 });
 

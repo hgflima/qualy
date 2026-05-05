@@ -210,11 +210,13 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/ignore-drift.test.ts cli/tests/unit/audit.test.ts` ✓ (10 ignore-drift + 4 novos audit drift gate); full unit suite 2455/2455 ✓; e2e 35/35 ✓; `npm run typecheck` ✓.
   - Deps: 2.2, 3.2 — satisfeitos.
 
-- [ ] **4.2 — Expired warning em `audit`** · S
-  - `findExpired` → `logger.warn` stderr + `audit.ignore_warnings: [{ id, glob, expires, days_overdue }]`
-  - Nunca bloqueia (SPEC §6)
-  - Verify: `npx vitest run cli/tests/unit/audit.test.ts` (fixture com expired entry)
-  - Deps: 4.1, 2.1
+- [x] **4.2 — Expired warning em `audit`** · S
+  - `cli/src/commands/audit.ts`: novo type `IgnoreWarning { id, glob, expires, days_overdue }` exposto em `AuditOk.ignore_warnings`. Helper local `daysOverdue(expires, now)` (UTC start-of-day diff em dias inteiros). Após `now` ser computado, `loadIgnoreManifest` + `findExpired` populam o array; cada entry vencida emite `logger.warn("ignore_expired", { id, glob, expires, days_overdue })`. Manifest absent / load failure (defensivo — drift check já triou corrupt) → array vazio. SPEC §6 Never preservada: warnings nunca alteram `result.ok`.
+  - **Decisão:** `ignore_warnings` fica fora de `AuditPayload` para não bumpar `AUDIT_SCHEMA_VERSION`; é re-derivável do manifest, então `/lint:report` pode ler `.harn/qualy/ignore.json` direto se precisar.
+  - **Tests novos (`cli/tests/unit/audit.test.ts`, 4 it() blocks):** manifest absent → `[]`; manifest sem expirados → `[]`; 2 expirados (1d + 32d) + 1 ativo → 2 warnings com shape correto + 2 `ignore_expired` records no stderr capturado via `setStreams`/`setLogLevel("warn")`; expired sozinho ainda mantém `result.ok === true`.
+  - **Path resolution em test:** `pathJoin(ROOT, ...IGNORE_MANIFEST_PATH.split("/"))` reproduz como `loadIgnoreManifest` joina o cwd (espelha pattern do `manifestPath` em `audit.ts` runtime).
+  - Verify: `npx vitest run cli/tests/unit/audit.test.ts` ✓ (33/33, 4 novos T4.2); full unit suite 2459/2459 ✓; e2e 35/35 ✓; `npm run typecheck` ✓.
+  - Deps: 4.1, 2.1 — satisfeitos.
 
 - [ ] **4.3 — Blast radius helper** · M
   - `commands/ignore/blast-radius.ts` (subcomando `qualy ignore-blast-radius <glob>`)
@@ -258,7 +260,7 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
 - [ ] #2 — `--rule quality-metrics/wmc` desabilita só essa rule; outras ainda disparam no path
 - [ ] #3 — `qualy ignore-list` mostra status (active/expired) correto
 - [ ] #4 — `--expired` exit `1` com vencidas, `0` sem
-- [ ] #5 — Entrada vencida → warning stderr em `audit` (SPEC fala em `lint` mas não há subcomando hoje — ver T4.1), exclusão ainda ativa
+- [x] #5 — Entrada vencida → warning stderr em `audit` (SPEC fala em `lint` mas não há subcomando hoje — ver T4.1), exclusão ainda ativa (T4.2: `logger.warn("ignore_expired", {…})` por entry + `AuditOk.ignore_warnings[]`; cobertura via `audit.test.ts` "expired ignore warnings (T4.2)")
 - [ ] #6 — Brownfield import na 1ª mutação com `createdBy: "imported"`
 - [ ] #7 — `/lint:ignore:{add,remove,list,explain}` end-to-end via slash command harness (frontmatter + allowed-tools test, paridade com `command-lint-uninstall-md.test.ts`)
 - [ ] #8 — Dirty + `--strict` → exit `3` (DIRTY_TREE — SPEC §3.1 lista "2"; canônico do projeto é 3, igual a `rules-add`/`rules-remove`) com mensagem `git stash`
