@@ -4,6 +4,17 @@
 > ordered by dependency. Each task leaves the repo in a working state.
 > See [TASKS.md](./TASKS.md) for the executable checklist.
 
+> **Status: completo (2026-05-05).** Todas as 6 tasks (Phase 1–3) e 3 checkpoints
+> (A, B, C) concluídos. Entregue no commit `5f80e0e`. Suite verde: 2022 unit +
+> 34 e2e (incluindo `installed-tarball.test.ts`). Smoke manual confirmado: pacote
+> publicado executa pós-`npm install` sem `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`.
+>
+> **Desvio de escopo registrado:** ao remover o erro de strip-types, apareceu
+> `ERR_MODULE_NOT_FOUND: zod` (mascarado antes). Para satisfazer SPEC §9 #4, todas
+> as runtime deps do CLI (`zod`, `ts-morph`, `esbuild`, `chart.js`,
+> `chartjs-chart-treemap`) — não só `tsx` — foram movidas para `dependencies` da
+> raiz. ADR 0011 e CHANGELOG documentam essa expansão.
+
 ## Overview
 
 Bug-fix focado: trocar `--experimental-strip-types` por `tsx` no shim `bin/qualy.mjs`
@@ -82,16 +93,16 @@ verificável:
 e atualizar o texto do `npm run build` noop para refletir tsx em vez de strip-types.
 
 **Acceptance criteria:**
-- [ ] `dependencies.tsx` = `"^4.19.0"` no `package.json` raiz.
-- [ ] `engines.node` = `">=20.0.0"` no `package.json` raiz.
-- [ ] String do `scripts.build` substitui `"Node 22.6+ executes .ts directly via --experimental-strip-types"` por `"executes .ts via tsx loader"` (ou texto equivalente — a propriedade externa "noop, sem build" é o que importa).
-- [ ] `npm install` no checkout completa sem warning de engine e instala `node_modules/tsx`.
+- [x] `dependencies.tsx` = `"^4.19.0"` no `package.json` raiz.
+- [x] `engines.node` = `">=20.0.0"` no `package.json` raiz.
+- [x] String do `scripts.build` substitui `"Node 22.6+ executes .ts directly via --experimental-strip-types"` por `"executes .ts via tsx loader"` (ou texto equivalente — a propriedade externa "noop, sem build" é o que importa).
+- [x] `npm install` no checkout completa sem warning de engine e instala `node_modules/tsx`.
 
 **Verification:**
-- [ ] `node -e "console.log(require('./package.json').dependencies.tsx)"` imprime `^4.19.0`.
-- [ ] `node -e "console.log(require('./package.json').engines.node)"` imprime `>=20.0.0`.
-- [ ] `ls node_modules/tsx/` lista artefatos do pacote tsx.
-- [ ] `npm run build` ainda exit 0 com mensagem nova.
+- [x] `node -e "console.log(require('./package.json').dependencies.tsx)"` imprime `^4.19.0`.
+- [x] `node -e "console.log(require('./package.json').engines.node)"` imprime `>=20.0.0`.
+- [x] `ls node_modules/tsx/` lista artefatos do pacote tsx.
+- [x] `npm run build` ainda exit 0 com mensagem nova.
 
 **Dependencies:** None.
 
@@ -110,16 +121,16 @@ Ajustar comentário do header para explicar **por que** tsx (barreira do `node_m
 Sem fallback condicional. Manter exit/signal handling existente.
 
 **Acceptance criteria:**
-- [ ] Shim importa `createRequire` de `node:module`.
-- [ ] Resolve tsx via `createRequire(import.meta.url).resolve("tsx/cli")` — não hardcode de path.
-- [ ] `spawn` recebe `[tsxBin, entry, ...process.argv.slice(2)]` (sem `--experimental-strip-types`).
-- [ ] Comentário do header explica a barreira do `node_modules/` e por que tsx (referência ao SPEC §1, mas sem citar nome de SPEC — comentário deve sobreviver renames).
-- [ ] Exit/signal forwarding inalterado vs versão atual.
+- [x] Shim importa `createRequire` de `node:module`.
+- [x] Resolve tsx via `createRequire(import.meta.url).resolve("tsx/cli")` — não hardcode de path.
+- [x] `spawn` recebe `[tsxBin, entry, ...process.argv.slice(2)]` (sem `--experimental-strip-types`).
+- [x] Comentário do header explica a barreira do `node_modules/` e por que tsx (referência ao SPEC §1, mas sem citar nome de SPEC — comentário deve sobreviver renames).
+- [x] Exit/signal forwarding inalterado vs versão atual.
 
 **Verification:**
-- [ ] `./bin/qualy.mjs --version` no checkout local imprime `0.1.0` (ou versão atual da raiz) com exit 0.
-- [ ] `node --check bin/qualy.mjs` (smoke de syntax) passa.
-- [ ] `grep -c experimental-strip-types bin/qualy.mjs` retorna `0`.
+- [x] `./bin/qualy.mjs --version` no checkout local imprime `0.1.0` (ou versão atual da raiz) com exit 0.
+- [x] `node --check bin/qualy.mjs` (smoke de syntax) passa.
+- [x] `grep -c experimental-strip-types bin/qualy.mjs` retorna `0`.
 
 **Dependencies:** Task 1 (tsx precisa estar em `node_modules/` para o `createRequire.resolve` funcionar).
 
@@ -135,10 +146,10 @@ Sem fallback condicional. Manter exit/signal handling existente.
 > Antes de prosseguir, **provar manualmente** que o fix resolve o bug original.
 > Esse smoke é o que faltou na release 0.1.0.
 
-- [ ] `npm pack` no `REPO_ROOT` gera `hgflima-qualy-0.1.0.tgz`.
-- [ ] Em `mktemp -d`: `npm init -y && npm install /abs/path/hgflima-qualy-0.1.0.tgz`.
-- [ ] `./node_modules/.bin/qualy --version` imprime `0.1.0` com exit 0 e **sem** `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` em stderr.
-- [ ] Em outro `mktemp -d` com `git init`: mesmo install, depois `./node_modules/.bin/qualy install --scope local --dry-run` — exit 0, stdout não-vazio.
+- [x] `npm pack` no `REPO_ROOT` gera `hgflima-qualy-0.1.0.tgz`.
+- [x] Em `mktemp -d`: `npm init -y && npm install /abs/path/hgflima-qualy-0.1.0.tgz`.
+- [x] `./node_modules/.bin/qualy --version` imprime `0.1.0` com exit 0 e **sem** `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` em stderr.
+- [x] Em outro `mktemp -d` com `git init`: mesmo install, depois `./node_modules/.bin/qualy install --scope local --dry-run` — exit 0, stdout não-vazio.
 
 Se algum passo falhar, voltar a Task 2 antes de avançar.
 
@@ -153,18 +164,18 @@ roda `npm pack`, cria projeto sintético, `npm install <tarball>`. Dois `it`s: `
 e `install --scope local --dry-run` em git repo. `afterAll` limpa tmpdirs.
 
 **Acceptance criteria:**
-- [ ] Arquivo existe em `cli/tests/e2e/install/installed-tarball.test.ts`.
-- [ ] Suite executa `npm pack` uma vez (não por teste) e reusa o tarball.
-- [ ] `it("'qualy --version' exits 0 and prints a version")` — assert exit 0 + regex `/^\d+\.\d+\.\d+/` no stdout.
-- [ ] `it("'qualy install --scope local --dry-run' exits 0 in a git repo")` — assert exit 0, stdout contém marcador previsível do plan, stderr não contém `ERR_UNSUPPORTED`.
-- [ ] Tmpdirs criados com `mkdtempSync` e removidos em `afterAll` (mesmo padrão de `install-scopes.test.ts`).
-- [ ] Suite passa em `npm run test:e2e`.
+- [x] Arquivo existe em `cli/tests/e2e/install/installed-tarball.test.ts`.
+- [x] Suite executa `npm pack` uma vez (não por teste) e reusa o tarball.
+- [x] `it("'qualy --version' exits 0 and prints a version")` — assert exit 0 + regex `/^\d+\.\d+\.\d+/` no stdout.
+- [x] `it("'qualy install --scope local --dry-run' exits 0 in a git repo")` — assert exit 0, stdout contém marcador previsível do plan, stderr não contém `ERR_UNSUPPORTED`.
+- [x] Tmpdirs criados com `mkdtempSync` e removidos em `afterAll` (mesmo padrão de `install-scopes.test.ts`).
+- [x] Suite passa em `npm run test:e2e`.
 
 **Verification:**
-- [ ] `npx vitest run cli/tests/e2e/install/installed-tarball.test.ts` exit 0.
-- [ ] `npm run test:e2e` exit 0 com 33+ testes (32 atual + ≥1 nova suite).
-- [ ] Test isola cache de npm via `process.env.npm_config_cache` apontando para tmp (evita corrida com vitest paralelo).
-- [ ] Sanity reverso: aplicar `git stash` no fix de Task 2, rodar a nova suite — **deve falhar** com `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`. Reverter o stash e reconfirmar pass.
+- [x] `npx vitest run cli/tests/e2e/install/installed-tarball.test.ts` exit 0.
+- [x] `npm run test:e2e` exit 0 com 33+ testes (32 atual + ≥1 nova suite).
+- [x] Test isola cache de npm via `process.env.npm_config_cache` apontando para tmp (evita corrida com vitest paralelo).
+- [x] Sanity reverso: aplicar `git stash` no fix de Task 2, rodar a nova suite — **deve falhar** com `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`. Reverter o stash e reconfirmar pass.
 
 **Dependencies:** Task 2 (o teste só passa com o fix aplicado).
 
@@ -177,12 +188,12 @@ e `install --scope local --dry-run` em git repo. `afterAll` limpa tmpdirs.
 
 ### Checkpoint B: Suite Verde + Snapshot Sane
 
-- [ ] `npm test` (unit) passa.
-- [ ] `npm run test:e2e` passa, incluindo a nova suite.
-- [ ] `npm run typecheck` passa.
-- [ ] `npm run lint` passa.
-- [ ] `npm pack --dry-run` produz tarball sem `cli/dist/`, `node_modules/tsx/`, ou qualquer artifact de build.
-- [ ] `pack-contents.test.ts.snap` **não** regrediu — se regrediu, investigar antes de aceitar `--update` (qualquer arquivo novo no tarball precisa ser revisão deliberada).
+- [x] `npm test` (unit) passa.
+- [x] `npm run test:e2e` passa, incluindo a nova suite.
+- [x] `npm run typecheck` passa.
+- [x] `npm run lint` passa.
+- [x] `npm pack --dry-run` produz tarball sem `cli/dist/`, `node_modules/tsx/`, ou qualquer artifact de build.
+- [x] `pack-contents.test.ts.snap` **não** regrediu — se regrediu, investigar antes de aceitar `--update` (qualquer arquivo novo no tarball precisa ser revisão deliberada).
 
 Se snapshot regrediu inesperadamente, **pause e investigue** — o esperado é diff zero
 porque `files: [...]` não mudou.
@@ -199,20 +210,20 @@ template existente do projeto (Status / Data / Contexto / Decisão / Consequênc
 Alternativas / Verificação) — copiar shape de ADR 0010.
 
 **Acceptance criteria:**
-- [ ] `docs/adrs/0011-tsx-runtime.md` existe com:
+- [x] `docs/adrs/0011-tsx-runtime.md` existe com:
   - Status: aceito; Data: 2026-05-05.
   - Contexto cita o bug `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` e a barreira do `node_modules/`.
   - Decisão: tsx via spawn, resolvido por `createRequire`, sem fallback.
   - Consequências: enumera o que muda vs ADR 0007 (drop strip-types, adiciona ~1MB de tsx em deps) e ADR 0010 D3 (mesmo shim, runtime diferente).
   - Alternativas consideradas: bundle via esbuild (rejeitada — viola "no build step"), `--experimental-strip-types` com lockfile workaround (não existe), Node bump (não resolve por design).
   - Verificação: aponta para `installed-tarball.test.ts` + smoke manual.
-- [ ] `docs/adrs/0007-runtime-ts-strip-types.md` ganha linha no header: `- Status: superseded by ADR 0011 (2026-05-05)`. Conteúdo histórico preservado.
-- [ ] `docs/adrs/0010-npm-distribution.md` ganha nota cruzada na seção `### D3` apontando para ADR 0011 (frase curta, ~2 linhas, sem reescrever a decisão).
+- [x] `docs/adrs/0007-runtime-ts-strip-types.md` ganha linha no header: `- Status: superseded by ADR 0011 (2026-05-05)`. Conteúdo histórico preservado.
+- [x] `docs/adrs/0010-npm-distribution.md` ganha nota cruzada na seção `### D3` apontando para ADR 0011 (frase curta, ~2 linhas, sem reescrever a decisão).
 
 **Verification:**
-- [ ] `grep -l "0011" docs/adrs/*.md` lista os 3 arquivos esperados.
-- [ ] `grep "superseded by ADR 0011" docs/adrs/0007-runtime-ts-strip-types.md` retorna 1 linha.
-- [ ] Render Markdown limpo (preview no editor).
+- [x] `grep -l "0011" docs/adrs/*.md` lista os 3 arquivos esperados.
+- [x] `grep "superseded by ADR 0011" docs/adrs/0007-runtime-ts-strip-types.md` retorna 1 linha.
+- [x] Render Markdown limpo (preview no editor).
 
 **Dependencies:** Task 2 (o ADR documenta a decisão tomada no código).
 
@@ -231,13 +242,13 @@ Alternativas / Verificação) — copiar shape de ADR 0010.
 (Success Criteria) e adicionar critério novo: "binário publicado executa pós-`npm install`".
 
 **Acceptance criteria:**
-- [ ] 4 substituições aplicadas em §8 (verificar via `grep -n '\bqualy\b' .harn/docs/npx-installer/SPEC.md` antes/depois — só sobram as ocorrências que **não** representam o nome do pacote npm).
-- [ ] Novo critério adicionado em §8 com texto tipo: `- [ ] Binário publicado executa pós-`npm install` em projeto limpo (cli/tests/e2e/install/installed-tarball.test.ts).`
-- [ ] Nenhuma outra seção tocada (escopo cirúrgico).
+- [x] 4 substituições aplicadas em §8 (verificar via `grep -n '\bqualy\b' .harn/docs/npx-installer/SPEC.md` antes/depois — só sobram as ocorrências que **não** representam o nome do pacote npm).
+- [x] Novo critério adicionado em §8 com texto tipo: `- [ ] Binário publicado executa pós-`npm install` em projeto limpo (cli/tests/e2e/install/installed-tarball.test.ts).`
+- [x] Nenhuma outra seção tocada (escopo cirúrgico).
 
 **Verification:**
-- [ ] `grep -c '@hgflima/qualy' .harn/docs/npx-installer/SPEC.md` aumenta em ≥4.
-- [ ] `grep installed-tarball .harn/docs/npx-installer/SPEC.md` retorna ≥1 linha.
+- [x] `grep -c '@hgflima/qualy' .harn/docs/npx-installer/SPEC.md` aumenta em ≥4.
+- [x] `grep installed-tarball .harn/docs/npx-installer/SPEC.md` retorna ≥1 linha.
 
 **Dependencies:** Task 3 (o novo critério referencia o teste por nome).
 
@@ -255,16 +266,16 @@ Decisão entre `[Unreleased]` vs `[0.1.1]` é explicitamente out-of-scope (SPEC 
 ficamos em `[Unreleased]` até a release ser cortada.
 
 **Acceptance criteria:**
-- [ ] Seção `[Unreleased]` ganha sub-seção `### Changed` (ou `### Fixed`) com bullet:
+- [x] Seção `[Unreleased]` ganha sub-seção `### Changed` (ou `### Fixed`) com bullet:
   - Mencionar troca de runtime (`--experimental-strip-types` → `tsx`).
   - Mencionar drop de `engines.node` para `>=20.0.0`.
   - Linkar ADR 0011 (path relativo).
   - Mencionar bug fix (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` em pacote instalado).
-- [ ] Texto segue tom do CHANGELOG existente (Keep a Changelog 1.1.0).
+- [x] Texto segue tom do CHANGELOG existente (Keep a Changelog 1.1.0).
 
 **Verification:**
-- [ ] `grep -A 5 '## \[Unreleased\]' CHANGELOG.md` mostra a entrada nova.
-- [ ] Markdown render limpo.
+- [x] `grep -A 5 '## \[Unreleased\]' CHANGELOG.md` mostra a entrada nova.
+- [x] Markdown render limpo.
 
 **Dependencies:** Task 4 (link para ADR 0011 só faz sentido depois que ele existe).
 
@@ -279,19 +290,19 @@ ficamos em `[Unreleased]` até a release ser cortada.
 
 Caminhar pelos 13 critérios do SPEC §9 e confirmar cada um:
 
-- [ ] `bin/qualy.mjs` resolve via `createRequire` (Task 2).
-- [ ] `package.json` lista `tsx ^4.19.0` em `dependencies` (Task 1).
-- [ ] `engines.node` = `>=20.0.0` (Task 1).
-- [ ] `npm install` + `qualy --version` exit 0, sem stderr de strip-types (Checkpoint A).
-- [ ] `installed-tarball.test.ts` existe e passa (Task 3).
-- [ ] `npm test` + `npm run test:e2e` verdes (Checkpoint B).
-- [ ] `npm pack --dry-run` sem build artifacts (Checkpoint B).
-- [ ] ADR 0011 com Status/Decisão/Consequências (Task 4).
-- [ ] ADR 0007 com linha de superseded (Task 4).
-- [ ] ADR 0010 D3 cross-link (Task 4).
-- [ ] SPEC §8 npx-installer atualizado (Task 5).
-- [ ] CHANGELOG entry (Task 6).
-- [ ] Smoke manual passa (Checkpoint A — re-rodar para confirmar nada regrediu durante Phase 3).
+- [x] `bin/qualy.mjs` resolve via `createRequire` (Task 2).
+- [x] `package.json` lista `tsx ^4.19.0` em `dependencies` (Task 1).
+- [x] `engines.node` = `>=20.0.0` (Task 1).
+- [x] `npm install` + `qualy --version` exit 0, sem stderr de strip-types (Checkpoint A).
+- [x] `installed-tarball.test.ts` existe e passa (Task 3).
+- [x] `npm test` + `npm run test:e2e` verdes (Checkpoint B).
+- [x] `npm pack --dry-run` sem build artifacts (Checkpoint B).
+- [x] ADR 0011 com Status/Decisão/Consequências (Task 4).
+- [x] ADR 0007 com linha de superseded (Task 4).
+- [x] ADR 0010 D3 cross-link (Task 4).
+- [x] SPEC §8 npx-installer atualizado (Task 5).
+- [x] CHANGELOG entry (Task 6).
+- [x] Smoke manual passa (Checkpoint A — re-rodar para confirmar nada regrediu durante Phase 3).
 
 Se qualquer item amarelo ou vermelho, voltar à task correspondente. **Não** marcar o
 spec como entregue até todos os 13 estarem verdes.
