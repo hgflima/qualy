@@ -1,11 +1,10 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "_comment": "qualy preset · stage=legacy · tier=deep · generated=2026-05-03",
   "categories": {
     "correctness": "warn",
     "suspicious": "warn"
   },
-  "plugins": ["quality-metrics"],
+  "jsPlugins": ["quality-metrics"],
   "rules": {
     "quality-metrics/wmc": ["warn", { "max": 40 }],
     "quality-metrics/halstead-volume": ["warn", { "max": 2000 }],

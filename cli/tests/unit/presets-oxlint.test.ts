@@ -33,9 +33,9 @@ type RuleEntry = Severity | [Severity, { max: number }];
 
 interface OxlintPreset {
   $schema: string;
-  _comment: string;
   categories?: Record<string, Severity>;
   plugins?: string[];
+  jsPlugins?: string[];
   rules?: Record<string, RuleEntry>;
 }
 
@@ -88,13 +88,15 @@ const EXPECTED_DEEP_RULES: Record<
 describe("oxlint presets — file presence and metadata", () => {
   for (const stage of STAGES) {
     for (const tier of TIERS) {
-      it(`${stage}.${tier}.json exists, parses, and carries SPEC §4 metadata`, () => {
+      it(`${stage}.${tier}.json exists, parses, and declares $schema`, () => {
         const preset = loadPreset(stage, tier);
         expect(typeof preset.$schema).toBe("string");
         expect(preset.$schema.length).toBeGreaterThan(0);
-        expect(typeof preset._comment).toBe("string");
-        expect(preset._comment).toContain(`stage=${stage}`);
-        expect(preset._comment).toContain(`tier=${tier}`);
+      });
+
+      it(`${stage}.${tier}.json carries no _comment field (oxlint 1.62.0 rejects it)`, () => {
+        const preset = loadPreset(stage, tier) as Record<string, unknown>;
+        expect(preset["_comment"]).toBeUndefined();
       });
     }
   }
@@ -109,6 +111,8 @@ describe("oxlint presets — fast tier", () => {
       expect(qmRules).toEqual([]);
       const plugins = preset.plugins ?? [];
       expect(plugins).not.toContain("quality-metrics");
+      const jsPlugins = preset.jsPlugins ?? [];
+      expect(jsPlugins).toEqual([]);
     });
 
     it(`${stage}.fast declares a 'correctness' category severity`, () => {
@@ -136,9 +140,10 @@ describe("oxlint presets — fast tier", () => {
 
 describe("oxlint presets — deep tier carries SPEC §3 thresholds", () => {
   for (const stage of STAGES) {
-    it(`${stage}.deep declares 'quality-metrics' in plugins`, () => {
+    it(`${stage}.deep declares 'quality-metrics' in jsPlugins (not plugins)`, () => {
       const preset = loadPreset(stage, "deep");
-      expect(preset.plugins ?? []).toContain("quality-metrics");
+      expect(preset.jsPlugins ?? []).toContain("quality-metrics");
+      expect(preset.plugins ?? []).not.toContain("quality-metrics");
     });
 
     const expected = EXPECTED_DEEP_RULES[stage];

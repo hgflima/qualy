@@ -1,11 +1,10 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "_comment": "qualy preset · stage=brownfield-moderate · tier=deep · generated=2026-05-03",
   "categories": {
     "correctness": "error",
     "suspicious": "warn"
   },
-  "plugins": ["quality-metrics"],
+  "jsPlugins": ["quality-metrics"],
   "rules": {
     "quality-metrics/wmc": ["error", { "max": 20 }],
     "quality-metrics/halstead-volume": ["warn", { "max": 1000 }],

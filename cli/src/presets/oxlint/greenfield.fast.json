@@ -1,6 +1,5 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "_comment": "qualy preset · stage=greenfield · tier=fast · generated=2026-05-03",
   "categories": {
     "correctness": "error",
     "suspicious": "warn"
