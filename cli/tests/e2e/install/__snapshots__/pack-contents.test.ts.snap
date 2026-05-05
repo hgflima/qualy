@@ -94,6 +94,7 @@ exports[`e2e: npm pack contents > snapshot of the full sorted file list 1`] = `
   "cli/src/templates/package-scripts.json",
   "cli/src/templates/post-edit.sh",
   "commands/lint/audit.md",
+  "commands/lint/ignore/add.md",
   "commands/lint/report.md",
   "commands/lint/rollback.md",
   "commands/lint/rules/add.md",

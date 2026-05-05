@@ -106,11 +106,13 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `node --experimental-strip-types cli/src/index.ts --help | grep ignore-` → 5 linhas ✓; `npx vitest run` → 2244 verde ✓; `npm run typecheck` ✓.
   - Deps: 2.3, 2.4, 2.5 — todos satisfeitos.
 
-- [ ] **2.7 — Slash command `/lint:ignore:add` (path-only)** · S
-  - Frontmatter + `AskUserQuestion` flow (glob → reason 4 opções → expires)
-  - Refuse em stack não-suportado
-  - Verify: `npx vitest run cli/tests/unit/command-lint-ignore-add-md.test.ts`
-  - Deps: 2.4, 2.6
+- [x] **2.7 — Slash command `/lint:ignore:add` (path-only)** · S
+  - `commands/lint/ignore/add.md` (74 linhas) com frontmatter completo, 6 seções canônicas (Visão Geral / Quando usar / Quando NÃO usar / Fluxo / Trade-offs / Verificação) e flow `AskUserQuestion` em 3+ etapas (glob → reason 4 opções → expires 4 opções).
+  - Refuse explícito em stack não-suportado (`detect-stack` exit `2`); refuse em manifesto corrompido (exit `70`); refuse em tree sujo + `--strict` com fluxo `git stash`.
+  - `cli/tests/unit/command-lint-ignore-add-md.test.ts` (37 it() blocks): hygiene + frontmatter + sections-in-order + CLI preamble + subcommand coverage + AskUserQuestion contract + exit-code mapping + global conventions. **Path-only enforcement:** test bloqueia `--rule <valor>` na seção Fluxo (Phase 2 não promete).
+  - Snapshot `pack-contents.test.ts.snap` refrescado com `commands/lint/ignore/add.md`.
+  - Verify: `npx vitest run cli/tests/unit/command-lint-ignore-add-md.test.ts` ✓; full suite 2281 verde ✓; `npm run typecheck` ✓.
+  - Deps: 2.4, 2.6 — satisfeitos.
 
 - [x] **2.8 — Distinguish missing vs malformed em `loadIgnoreManifest`** · S
   - Hoje `loadIgnoreManifest` devolve `null` para ausente, JSON inválido OU `version != 1` (silencioso). SPEC §3.1 diz "exit `5` — fatal: manifesto corrompido"; precisamos diferenciar.
