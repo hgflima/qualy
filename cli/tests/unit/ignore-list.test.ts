@@ -286,6 +286,72 @@ describe("ignoreList — manifest corrupt", () => {
   });
 });
 
+describe("ignoreList — category_size (T3.3)", () => {
+  it("annotates category:<known> entries with category_size from the static catalog", () => {
+    const fs = makeFs({
+      [`/repo/${IGNORE_MANIFEST_PATH}`]: manifest([
+        {
+          id: "ign-cat001",
+          glob: "src/generated/**",
+          rule: "category:perf",
+          reason: "generated",
+          expires: null,
+          createdAt: "2026-03-01T00:00:00.000Z",
+          createdBy: "user",
+        },
+        {
+          id: "ign-rule01",
+          glob: "src/legacy/**",
+          rule: "quality-metrics/wmc",
+          reason: "legacy",
+          expires: null,
+          createdAt: "2026-03-01T00:00:00.000Z",
+          createdBy: "user",
+        },
+        {
+          id: "ign-pp0001",
+          glob: "src/path/**",
+          rule: null,
+          reason: "path-only",
+          expires: null,
+          createdAt: "2026-03-01T00:00:00.000Z",
+          createdBy: "user",
+        },
+      ]),
+    });
+    const r = ignoreList({ cwd: "/repo" }, { safeIO: fs.io, now: () => NOW });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const cat = r.entries.find((e) => e.id === "ign-cat001")!;
+    // category:perf has 13 rules in the static catalog (oxlint 1.62.0).
+    expect(cat.category_size).toBe(13);
+    const ruleEntry = r.entries.find((e) => e.id === "ign-rule01")!;
+    expect(ruleEntry.category_size).toBeUndefined();
+    const pathOnly = r.entries.find((e) => e.id === "ign-pp0001")!;
+    expect(pathOnly.category_size).toBeUndefined();
+  });
+
+  it("does not set category_size for unknown category names", () => {
+    const fs = makeFs({
+      [`/repo/${IGNORE_MANIFEST_PATH}`]: manifest([
+        {
+          id: "ign-cat999",
+          glob: "src/x/**",
+          rule: "category:bogus",
+          reason: "x",
+          expires: null,
+          createdAt: "2026-03-01T00:00:00.000Z",
+          createdBy: "user",
+        },
+      ]),
+    });
+    const r = ignoreList({ cwd: "/repo" }, { safeIO: fs.io, now: () => NOW });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.entries[0]!.category_size).toBeUndefined();
+  });
+});
+
 describe("ignoreList — ordering", () => {
   it("sorts entries by id ascending", () => {
     const fs = makeFs({

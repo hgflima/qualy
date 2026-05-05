@@ -1,14 +1,31 @@
 /**
- * `ignore-add` — author / update a path-only ignore entry in
- * `.harn/qualy/ignore.json`, recompile both oxlint presets, and append a
- * `ignore-add`/`ignore-update` entry to `.harn/qualy/docs/lint-decisions.md`
- * (lint-ignore SPEC §3.1, PLAN T2.4).
+ * `ignore-add` — author / update an ignore entry in `.harn/qualy/ignore.json`,
+ * recompile both oxlint presets, and append a `ignore-add`/`ignore-update`
+ * entry to `.harn/qualy/docs/lint-decisions.md` (lint-ignore SPEC §3.1, PLAN
+ * T2.4 + T3.3).
  *
- * Phase 2 scope: path-only entries (`rule === null`). The `--rule` flag is
- * deferred to T3.3 along with `category:*` expansion. Brownfield import
- * (auto-importing user-authored `ignorePatterns[]` outside the markers) is
- * deferred to T3.4 — until then this command assumes a greenfield manifest or
- * a manifest already authored by qualy.
+ * Scope:
+ *   - path-only entries (`--rule` omitted) → `ignorePatterns[]` exclusion.
+ *   - per-rule entries (`--rule quality-metrics/wmc`, `--rule eslint/no-debugger`,
+ *     etc.) → managed override block silencing the named rule on the glob.
+ *   - category entries (`--rule category:correctness`) → managed override block
+ *     silencing every rule in the category. Requires
+ *     `--i-know-this-disables-many` to acknowledge the blast radius
+ *     (SPEC §3.1.1). The slash command `/lint:ignore:add` injects this flag
+ *     after surfacing the category size via `AskUserQuestion`.
+ *
+ * Validation:
+ *   - `quality-metrics/<name>` must be a known qualy metric rule
+ *     (wmc/halstead/lcom/cbo/dit). Unknown QM names fail fast with
+ *     `unknown_rule` so typos do not silently land an opaque entry.
+ *   - `category:<name>` must be in `KNOWN_CATEGORIES` from the static catalog.
+ *   - All other rule strings are accepted opaque (third-party plugins, future
+ *     oxlint rules) — oxlint will surface its own error if the rule does not
+ *     exist at lint time.
+ *
+ * Brownfield import (auto-importing user-authored `ignorePatterns[]` outside
+ * the markers) is deferred to T3.4 — until then this command assumes a
+ * greenfield manifest or a manifest already authored by qualy.
  *
  * Flow:
  *   1. validate args (glob non-empty, reason non-empty, expires future-or-null)
@@ -38,6 +55,12 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { METRIC_KEYS } from "../../lib/audit-schema.ts";
+import {
+  getCategorySize,
+  isKnownCategory,
+  KNOWN_CATEGORIES,
+} from "../../lib/category-catalog.ts";
 import {
   formatDecisionEntry as formatGenericEntry,
   insertEntryBetweenMarkers,
@@ -74,15 +97,20 @@ export interface IgnoreAddOptions {
   readonly cwd: string;
   readonly glob: string;
   readonly reason: string;
+  readonly rule?: string | null;
   readonly expires?: string | null;
   readonly strict?: boolean;
+  /** Required when `rule` is `category:<name>` — acknowledges that the
+   *  exclusion silences every rule in the category on the glob (SPEC §3.1.1).
+   *  Slash commands inject this after `AskUserQuestion` confirmation. */
+  readonly acknowledgeCategory?: boolean;
 }
 
 export interface IgnoreAddOk {
   readonly ok: true;
   readonly cwd: string;
   readonly glob: string;
-  readonly rule: null;
+  readonly rule: string | null;
   readonly action: "added" | "updated";
   readonly id: string;
   readonly expires: string | null;
@@ -153,6 +181,81 @@ const DECISIONS_TEMPLATE_DEFAULT = join(
 );
 
 // ---------------------------------------------------------------------------
+// Rule validation
+// ---------------------------------------------------------------------------
+
+/** Set of `quality-metrics/<name>` rule ids that qualy ships and audits.
+ *  An ignore-add for a typo'd QM rule (e.g. `quality-metrics/wcm`) would
+ *  silently land in the manifest without ever silencing anything — so we
+ *  validate against this set up-front. Source of truth: `audit-schema.ts`
+ *  `METRIC_KEYS`. */
+const KNOWN_QUALITY_METRICS_RULES: ReadonlySet<string> = new Set(
+  METRIC_KEYS.map((k) => `quality-metrics/${k}`),
+);
+
+const QM_PREFIX = "quality-metrics/";
+const CATEGORY_PREFIX = "category:";
+
+interface RuleValidationOk {
+  readonly ok: true;
+  /** Normalised rule string, or `null` for path-only entries. */
+  readonly rule: string | null;
+}
+
+interface RuleValidationErr {
+  readonly ok: false;
+  readonly error: "unknown_rule" | "unknown_category" | "category_requires_ack";
+  readonly reason: string;
+}
+
+type RuleValidationResult = RuleValidationOk | RuleValidationErr;
+
+function validateRule(
+  raw: string | null | undefined,
+  acknowledgeCategory: boolean,
+): RuleValidationResult {
+  if (raw === null || raw === undefined) return { ok: true, rule: null };
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return { ok: true, rule: null };
+
+  if (trimmed.startsWith(CATEGORY_PREFIX)) {
+    const name = trimmed.slice(CATEGORY_PREFIX.length);
+    if (!isKnownCategory(name)) {
+      return {
+        ok: false,
+        error: "unknown_category",
+        reason: `category '${name}' is not in the qualy catalog (known: ${KNOWN_CATEGORIES.join(", ")})`,
+      };
+    }
+    if (!acknowledgeCategory) {
+      const size = getCategorySize(name);
+      return {
+        ok: false,
+        error: "category_requires_ack",
+        reason: `--rule ${trimmed} silences ${size} rules on this glob; pass --i-know-this-disables-many to acknowledge`,
+      };
+    }
+    return { ok: true, rule: trimmed };
+  }
+
+  if (trimmed.startsWith(QM_PREFIX)) {
+    if (!KNOWN_QUALITY_METRICS_RULES.has(trimmed)) {
+      const known = [...KNOWN_QUALITY_METRICS_RULES].sort().join(", ");
+      return {
+        ok: false,
+        error: "unknown_rule",
+        reason: `rule '${trimmed}' is not a known quality-metrics rule (known: ${known})`,
+      };
+    }
+    return { ok: true, rule: trimmed };
+  }
+
+  // Opaque rule (third-party plugin, future oxlint rule). Accept as-is —
+  // oxlint surfaces its own error if the rule doesn't exist at lint time.
+  return { ok: true, rule: trimmed };
+}
+
+// ---------------------------------------------------------------------------
 // Decision-log entry
 // ---------------------------------------------------------------------------
 
@@ -163,6 +266,7 @@ function isoUtc(d: Date): string {
 interface DecisionInputs {
   readonly action: "added" | "updated";
   readonly glob: string;
+  readonly rule: string | null;
   readonly id: string;
   readonly reason: string;
   readonly expires: string | null;
@@ -172,7 +276,8 @@ interface DecisionInputs {
 
 function formatIgnoreDecision(inputs: DecisionInputs): string {
   const kind = inputs.action === "added" ? "ignore-add" : "ignore-update";
-  const subject = `${inputs.glob} (path-only)`;
+  const ruleLabel = inputs.rule ?? "(path-only)";
+  const subject = `${inputs.glob} ${inputs.rule === null ? "(path-only)" : `(${inputs.rule})`}`;
   return formatGenericEntry({
     timestamp: isoUtc(inputs.now),
     kind,
@@ -180,7 +285,7 @@ function formatIgnoreDecision(inputs: DecisionInputs): string {
     bullets: [
       ["kind", kind],
       ["glob", inputs.glob],
-      ["rule", "(path-only)"],
+      ["rule", ruleLabel],
       ["id", inputs.id],
       ["expires", inputs.expires ?? "(never)"],
       ["author", inputs.author],
@@ -233,6 +338,23 @@ export function ignoreAdd(
     };
   }
 
+  // Validate optional `--rule` (path-only when null/empty; quality-metrics/*
+  // and category:* are gated against the static catalog; everything else is
+  // opaque per SPEC §3.1).
+  const ruleCheck = validateRule(
+    opts.rule ?? null,
+    opts.acknowledgeCategory === true,
+  );
+  if (!ruleCheck.ok) {
+    return {
+      ok: false,
+      error: ruleCheck.error,
+      reason: ruleCheck.reason,
+      exitCode: EXIT_CODES.RECOVERABLE_ERROR,
+    };
+  }
+  const rule = ruleCheck.rule;
+
   // 2. --strict pre-flight.
   if (opts.strict === true) {
     const dirtyFn = deps.dirtyFilesFn ?? defaultDirtyFiles;
@@ -279,10 +401,11 @@ export function ignoreAdd(
   const manifest: IgnoreManifest =
     loaded.manifest ?? { version: 1, entries: [] };
 
-  // 5. Upsert entry (path-only — rule === null).
+  // 5. Upsert entry. `rule` is null for path-only, otherwise the validated
+  // rule string (quality-metrics/<name>, category:<name>, or opaque).
   const upserted = upsertEntry(manifest, {
     glob: opts.glob,
-    rule: null,
+    rule,
     reason,
     expires,
     createdBy: "user",
@@ -336,6 +459,7 @@ export function ignoreAdd(
   const entryText = formatIgnoreDecision({
     action: upserted.action,
     glob: opts.glob,
+    rule,
     id: upserted.entry.id,
     reason,
     expires,
@@ -372,7 +496,7 @@ export function ignoreAdd(
     ok: true,
     cwd: opts.cwd,
     glob: opts.glob,
-    rule: null,
+    rule,
     action: upserted.action,
     id: upserted.entry.id,
     expires,
@@ -390,8 +514,10 @@ export interface ParsedArgs {
   readonly cwd: string;
   readonly glob: string;
   readonly reason: string;
+  readonly rule: string | null;
   readonly expires: string | null;
   readonly strict: boolean;
+  readonly acknowledgeCategory: boolean;
 }
 
 export type ArgParseResult =
@@ -406,8 +532,10 @@ export function parseIgnoreAddArgs(
   let glob: string | null = null;
   let positional: string | null = null;
   let reason: string | null = null;
+  let rule: string | null = null;
   let expires: string | null = null;
   let strict = false;
+  let acknowledgeCategory = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -438,6 +566,15 @@ export function parseIgnoreAddArgs(
       i++;
       continue;
     }
+    if (arg === "--rule") {
+      const value = argv[i + 1];
+      if (typeof value !== "string" || value.length === 0) {
+        return { ok: false, error: "missing value for --rule" };
+      }
+      rule = value;
+      i++;
+      continue;
+    }
     if (arg === "--expires") {
       const value = argv[i + 1];
       if (typeof value !== "string" || value.length === 0) {
@@ -449,6 +586,10 @@ export function parseIgnoreAddArgs(
     }
     if (arg === "--strict") {
       strict = true;
+      continue;
+    }
+    if (arg === "--i-know-this-disables-many") {
+      acknowledgeCategory = true;
       continue;
     }
     if (arg === "--help" || arg === "-h") {
@@ -478,8 +619,10 @@ export function parseIgnoreAddArgs(
       cwd,
       glob: resolvedGlob,
       reason,
+      rule,
       expires,
       strict,
+      acknowledgeCategory,
     },
   };
 }
@@ -489,21 +632,29 @@ export function runIgnoreAdd(argv: readonly string[]): ExitCode {
   if (!parsed.ok) {
     if (parsed.error === "help") {
       process.stderr.write(
-        "qualy ignore-add <glob> --reason <text> [--expires <YYYY-MM-DD>]\n" +
-          "                 [--strict] [--cwd <path>]\n" +
+        "qualy ignore-add <glob> --reason <text> [--rule <rule-id>]\n" +
+          "                 [--expires <YYYY-MM-DD>] [--strict]\n" +
+          "                 [--i-know-this-disables-many] [--cwd <path>]\n" +
           "\n" +
-          "Adds (or updates) a path-only ignore entry in .harn/qualy/ignore.json,\n" +
+          "Adds (or updates) an ignore entry in .harn/qualy/ignore.json,\n" +
           "recompiles oxlint.{fast,deep}.json, and appends an `ignore-add` /\n" +
           "`ignore-update` entry to .harn/qualy/docs/lint-decisions.md.\n" +
           "\n" +
           "--reason is mandatory (SPEC §6 — exclusões são dívida técnica auditável).\n" +
+          "--rule scopes the exclusion to a single rule (e.g. quality-metrics/wmc,\n" +
+          "  eslint/no-debugger) or a whole category (category:correctness). Omit\n" +
+          "  for a path-only exclusion.\n" +
           "--expires takes a future YYYY-MM-DD; past dates are rejected.\n" +
           "--strict refuses to write when the git working tree is dirty.\n" +
+          "--i-know-this-disables-many is required when --rule category:* is set\n" +
+          "  (SPEC §3.1.1 — categories silence dozens of rules at once).\n" +
           "\n" +
-          "Re-adding the same glob updates the entry in place (kind:ignore-update).\n" +
+          "Re-adding the same (glob, rule) updates the entry in place\n" +
+          "(kind:ignore-update).\n" +
           "\n" +
-          "Exit codes: 0 ok, 1 invalid input / preset missing / decisions failure,\n" +
-          "  3 dirty tree under --strict, 4 usage, 70 ignore manifest corrupt.\n",
+          "Exit codes: 0 ok, 1 invalid input / unknown rule / category without\n" +
+          "  ack / preset missing / decisions failure, 3 dirty tree under\n" +
+          "  --strict, 4 usage, 70 ignore manifest corrupt.\n",
       );
       return EXIT_CODES.OK;
     }
@@ -516,8 +667,10 @@ export function runIgnoreAdd(argv: readonly string[]): ExitCode {
     cwd: parsed.value.cwd,
     glob: parsed.value.glob,
     reason: parsed.value.reason,
+    rule: parsed.value.rule,
     expires: parsed.value.expires,
     strict: parsed.value.strict,
+    acknowledgeCategory: parsed.value.acknowledgeCategory,
   });
 
   if (!result.ok) {

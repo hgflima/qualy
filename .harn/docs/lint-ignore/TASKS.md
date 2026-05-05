@@ -50,9 +50,9 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
 
 ### ✅ Checkpoint Phase 1
 - [x] `npx vitest run` 100% verde (2182/2182, re-verificado 2026-05-05)
-- [ ] Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo
-- [ ] `.lint-manifest.json` aponta novo path
-- [ ] 2ª invocação = no-op idempotente
+- [x] Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo
+- [x] `.lint-manifest.json` aponta novo path
+- [x] 2ª invocação = no-op idempotente
 
 > **Repo state (2026-05-05):** `/Users/henriquelima/dev/personal/qualy/docs/` não contém `lint-decisions.md`. Smoke manual exige criar fixture sintético em scratch repo — não pode ser feito in-tree.
 
@@ -151,12 +151,15 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/ignore-compile.test.ts` ✓ (25/25); full suite 2286/2286 ✓; `npm run typecheck` ✓.
   - Deps: 2.2, 3.1 — satisfeitos.
 
-- [ ] **3.3 — Extend `commands/ignore/add.ts` (`--rule`)** · M
-  - Validar `quality-metrics/*` em `KNOWN_RULES`, `category:<name>` em `KNOWN_CATEGORIES`, outros opaque
-  - `category:*` sem `--i-know-this-disables-many` → exit `1` `category_requires_ack`
-  - `ignore-list` mostra sufixo `⚠ category (N rules)`
-  - Verify: `npx vitest run cli/tests/unit/ignore-{add,list}.test.ts`
-  - Deps: 3.1, 3.2, 2.4
+- [x] **3.3 — Extend `commands/ignore/add.ts` (`--rule`)** · M
+  - `--rule <id>` aceita: `quality-metrics/<name>` validado contra `KNOWN_QUALITY_METRICS_RULES` (derivado de `audit-schema.METRIC_KEYS` — wmc/halstead/lcom/cbo/dit), `category:<name>` validado contra `KNOWN_CATEGORIES`, e qualquer outra string como opaque (third-party plugins, future oxlint rules — oxlint surfaces erro próprio em lint time).
+  - `category:*` sem `--i-know-this-disables-many` → exit `1` `category_requires_ack` com `reason` mencionando o tamanho da categoria (ex.: `silences 13 rules`) e a flag necessária. Slash command `/lint:ignore:add` é responsável por surface `AskUserQuestion` antes de injetar a flag (T3.5).
+  - `parseIgnoreAddArgs` aprende `--rule <id>` e `--i-know-this-disables-many`. `runIgnoreAdd` propaga ambos para `ignoreAdd`. Help text atualizado.
+  - `IgnoreAddOk.rule` agora é `string | null` (era `null` em P2). Decision log entry mostra `rule: <id>` real (subject e bullet) ao invés de `(path-only)`.
+  - **`ignore-list` annotation:** `IgnoreListEntry.category_size?: number` é populado quando `rule === "category:<known>"` via `getCategorySize`. Slash command renderiza como `⚠ category (N rules)`. Para `category:bogus` (unknown) ou rules não-categóricas → `category_size` ausente.
+  - Pack-contents snapshot refrescado: `cli/src/lib/category-catalog.ts` foi adicionado em T3.1 mas o snapshot não havia sido atualizado (T3.2 não rodou e2e). `npx vitest run cli/tests/e2e/install/pack-contents.test.ts` agora verde.
+  - Verify: `npx vitest run cli/tests/unit/ignore-{add,list}.test.ts` ✓ (42/42 incluindo 12 novos casos de `--rule`/category); full suite 2298 ✓; e2e 35 ✓; `npm run typecheck` ✓.
+  - Deps: 3.1, 3.2, 2.4 — satisfeitos.
 
 - [ ] **3.4 — `lib/ignore-import.ts` (brownfield)** · M
   - Detecta non-marker patterns em presets, importa com `createdBy: "imported"`
@@ -264,6 +267,7 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
 
 ## Blocked (Ralph)
 
+- Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo (stuck after 3 attempts)
 - Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo (stuck after 3 attempts)
 - Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo (stuck after 3 attempts)
 - Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo (stuck after 3 attempts)

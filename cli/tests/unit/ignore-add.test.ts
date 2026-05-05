@@ -133,6 +133,31 @@ describe("parseIgnoreAddArgs", () => {
     if (!r.ok) return;
     expect(r.value.expires).toBe("2026-09-30");
     expect(r.value.strict).toBe(true);
+    expect(r.value.rule).toBeNull();
+    expect(r.value.acknowledgeCategory).toBe(false);
+  });
+
+  it("parses --rule and --i-know-this-disables-many", () => {
+    const r = parseIgnoreAddArgs(
+      [
+        "a/**",
+        "--reason",
+        "x",
+        "--rule",
+        "category:correctness",
+        "--i-know-this-disables-many",
+      ],
+      "/repo",
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.rule).toBe("category:correctness");
+    expect(r.value.acknowledgeCategory).toBe(true);
+  });
+
+  it("rejects --rule without a value", () => {
+    const r = parseIgnoreAddArgs(["a/**", "--reason", "x", "--rule"], "/repo");
+    expect(r.ok).toBe(false);
   });
 
   it("rejects when --reason is missing (USAGE_ERROR)", () => {
@@ -458,6 +483,213 @@ describe("ignoreAdd — preset missing", () => {
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error).toBe("preset_missing");
+    expect(r.exitCode).toBe(EXIT_CODES.RECOVERABLE_ERROR);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ignoreAdd — --rule (T3.3: per-rule + category)
+// ---------------------------------------------------------------------------
+
+describe("ignoreAdd — --rule per-rule", () => {
+  it("accepts a known quality-metrics rule and stores it on the entry", () => {
+    const fs = makeFs({
+      [`/repo/${PRESET_PATHS.fast}`]: emptyPreset(),
+      [`/repo/${PRESET_PATHS.deep}`]: emptyPreset(),
+    });
+    const r = ignoreAdd(
+      {
+        cwd: "/repo",
+        glob: "src/legacy/**",
+        rule: "quality-metrics/wmc",
+        reason: "legacy hot path",
+        expires: null,
+      },
+      deps(fs),
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.rule).toBe("quality-metrics/wmc");
+    const manifest = JSON.parse(
+      fs.files.get(`/repo/${IGNORE_MANIFEST_PATH}`)!,
+    );
+    expect(manifest.entries).toHaveLength(1);
+    expect(manifest.entries[0].rule).toBe("quality-metrics/wmc");
+    // Decision log carries the rule rather than `(path-only)`.
+    const log = fs.files.get(`/repo/${DECISION_LOG_PATH}`)!;
+    expect(log).toMatch(/- \*\*rule\*\*: quality-metrics\/wmc/);
+    expect(log).not.toMatch(/- \*\*rule\*\*: \(path-only\)/);
+  });
+
+  it("rejects unknown quality-metrics rules → exit 1 unknown_rule", () => {
+    const fs = makeFs({
+      [`/repo/${PRESET_PATHS.fast}`]: emptyPreset(),
+      [`/repo/${PRESET_PATHS.deep}`]: emptyPreset(),
+    });
+    const r = ignoreAdd(
+      {
+        cwd: "/repo",
+        glob: "a/**",
+        rule: "quality-metrics/wcm", // typo
+        reason: "x",
+        expires: null,
+      },
+      deps(fs),
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toBe("unknown_rule");
+    expect(r.exitCode).toBe(EXIT_CODES.RECOVERABLE_ERROR);
+    // Nothing was written.
+    expect(fs.files.has(`/repo/${IGNORE_MANIFEST_PATH}`)).toBe(false);
+  });
+
+  it("accepts opaque third-party rules (e.g. eslint/no-debugger) without validation", () => {
+    const fs = makeFs({
+      [`/repo/${PRESET_PATHS.fast}`]: emptyPreset(),
+      [`/repo/${PRESET_PATHS.deep}`]: emptyPreset(),
+    });
+    const r = ignoreAdd(
+      {
+        cwd: "/repo",
+        glob: "scripts/**",
+        rule: "eslint/no-debugger",
+        reason: "scripts allow debugger",
+        expires: null,
+      },
+      deps(fs),
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.rule).toBe("eslint/no-debugger");
+  });
+
+  it("treats empty rule string as path-only (rule === null)", () => {
+    const fs = makeFs({
+      [`/repo/${PRESET_PATHS.fast}`]: emptyPreset(),
+      [`/repo/${PRESET_PATHS.deep}`]: emptyPreset(),
+    });
+    const r = ignoreAdd(
+      {
+        cwd: "/repo",
+        glob: "a/**",
+        rule: "   ",
+        reason: "x",
+        expires: null,
+      },
+      deps(fs),
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.rule).toBeNull();
+  });
+
+  it("re-add with the same (glob, rule) updates in place; (glob, null) is a separate entry", () => {
+    const fs = makeFs({
+      [`/repo/${PRESET_PATHS.fast}`]: emptyPreset(),
+      [`/repo/${PRESET_PATHS.deep}`]: emptyPreset(),
+    });
+    const first = ignoreAdd(
+      {
+        cwd: "/repo",
+        glob: "src/legacy/**",
+        rule: "quality-metrics/wmc",
+        reason: "legacy",
+        expires: null,
+      },
+      deps(fs),
+    );
+    expect(first.ok).toBe(true);
+    const pathOnly = ignoreAdd(
+      {
+        cwd: "/repo",
+        glob: "src/legacy/**",
+        reason: "whole legacy tree",
+        expires: null,
+      },
+      deps(fs),
+    );
+    expect(pathOnly.ok).toBe(true);
+    if (!pathOnly.ok) return;
+    expect(pathOnly.action).toBe("added");
+    const manifest = JSON.parse(
+      fs.files.get(`/repo/${IGNORE_MANIFEST_PATH}`)!,
+    );
+    expect(manifest.entries).toHaveLength(2);
+  });
+});
+
+describe("ignoreAdd — --rule category:*", () => {
+  it("rejects category:* without --i-know-this-disables-many → exit 1 category_requires_ack", () => {
+    const fs = makeFs({
+      [`/repo/${PRESET_PATHS.fast}`]: emptyPreset(),
+      [`/repo/${PRESET_PATHS.deep}`]: emptyPreset(),
+    });
+    const r = ignoreAdd(
+      {
+        cwd: "/repo",
+        glob: "src/generated/**",
+        rule: "category:correctness",
+        reason: "generated code",
+        expires: null,
+      },
+      deps(fs),
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toBe("category_requires_ack");
+    expect(r.exitCode).toBe(EXIT_CODES.RECOVERABLE_ERROR);
+    // Reason mentions the category size so the user understands the blast.
+    expect(r.reason).toMatch(/silences \d+ rules/);
+    expect(r.reason).toMatch(/--i-know-this-disables-many/);
+    // Nothing was written.
+    expect(fs.files.has(`/repo/${IGNORE_MANIFEST_PATH}`)).toBe(false);
+  });
+
+  it("accepts category:* with --i-know-this-disables-many", () => {
+    const fs = makeFs({
+      [`/repo/${PRESET_PATHS.fast}`]: emptyPreset(),
+      [`/repo/${PRESET_PATHS.deep}`]: emptyPreset(),
+    });
+    const r = ignoreAdd(
+      {
+        cwd: "/repo",
+        glob: "src/generated/**",
+        rule: "category:perf",
+        reason: "generated code",
+        expires: null,
+        acknowledgeCategory: true,
+      },
+      deps(fs),
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.rule).toBe("category:perf");
+    const manifest = JSON.parse(
+      fs.files.get(`/repo/${IGNORE_MANIFEST_PATH}`)!,
+    );
+    expect(manifest.entries[0].rule).toBe("category:perf");
+  });
+
+  it("rejects unknown category names → exit 1 unknown_category", () => {
+    const fs = makeFs({
+      [`/repo/${PRESET_PATHS.fast}`]: emptyPreset(),
+      [`/repo/${PRESET_PATHS.deep}`]: emptyPreset(),
+    });
+    const r = ignoreAdd(
+      {
+        cwd: "/repo",
+        glob: "a/**",
+        rule: "category:bogus",
+        reason: "x",
+        expires: null,
+        acknowledgeCategory: true,
+      },
+      deps(fs),
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toBe("unknown_category");
     expect(r.exitCode).toBe(EXIT_CODES.RECOVERABLE_ERROR);
   });
 });

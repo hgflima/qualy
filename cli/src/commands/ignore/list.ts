@@ -25,6 +25,10 @@
  */
 import { resolve } from "node:path";
 
+import {
+  getCategorySize,
+  isKnownCategory,
+} from "../../lib/category-catalog.ts";
 import { EXIT_CODES, type ExitCode } from "../../lib/exit-codes.ts";
 import { type SafeIO } from "../../lib/fs-safe.ts";
 import {
@@ -57,6 +61,10 @@ export interface IgnoreListEntry {
   readonly status: IgnoreListStatus;
   /** Whole days `expires` is past `now` (only present when `status === "expired"`). */
   readonly days_overdue?: number;
+  /** Number of rules a `category:<name>` entry expands to (SPEC §3.1.1).
+   *  Slash commands render this as `⚠ category (N rules)` next to the rule
+   *  column. Only present for `rule === "category:<known>"`. */
+  readonly category_size?: number;
 }
 
 export interface IgnoreListOk {
@@ -92,20 +100,36 @@ function startOfUtcDay(d: Date): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
+const CATEGORY_PREFIX = "category:";
+
+function categorySizeFor(rule: string | null): number | undefined {
+  if (rule === null || !rule.startsWith(CATEGORY_PREFIX)) return undefined;
+  const name = rule.slice(CATEGORY_PREFIX.length);
+  if (!isKnownCategory(name)) return undefined;
+  return getCategorySize(name);
+}
+
 function decorateEntry(entry: IgnoreEntry, now: Date): IgnoreListEntry {
+  const categorySize = categorySizeFor(entry.rule);
+  const sizeBullet = categorySize === undefined ? {} : { category_size: categorySize };
   if (entry.expires === null || !ISO_DATE_RE.test(entry.expires)) {
-    return { ...entry, status: "active" };
+    return { ...entry, status: "active", ...sizeBullet };
   }
   const expiresMs = Date.parse(`${entry.expires}T00:00:00.000Z`);
   if (!Number.isFinite(expiresMs)) {
-    return { ...entry, status: "active" };
+    return { ...entry, status: "active", ...sizeBullet };
   }
   const today = startOfUtcDay(now);
   if (expiresMs >= today) {
-    return { ...entry, status: "active" };
+    return { ...entry, status: "active", ...sizeBullet };
   }
   const daysOverdue = Math.floor((today - expiresMs) / MS_PER_DAY);
-  return { ...entry, status: "expired", days_overdue: daysOverdue };
+  return {
+    ...entry,
+    status: "expired",
+    days_overdue: daysOverdue,
+    ...sizeBullet,
+  };
 }
 
 // ---------------------------------------------------------------------------
