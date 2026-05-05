@@ -1,0 +1,17 @@
+{
+  "name": "ignore-expired-fixture",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Synthetic project with a pre-populated `.harn/qualy/ignore.json` containing an expired entry — used to exercise the expired-warning path in `qualy audit` (lint-ignore SPEC §10 #5, T4.2).",
+  "scripts": {
+    "start": "node --experimental-strip-types src/index.ts"
+  },
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "devDependencies": {
+    "oxlint": "^1.62.0",
+    "typescript": "^5.5.4"
+  }
+}

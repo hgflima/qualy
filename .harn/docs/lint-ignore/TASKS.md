@@ -230,13 +230,15 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npm run typecheck` ✓; `npm test` ✓ (2482 unit, +21 da T4.3); `npm run test:e2e` ✓ (35/35); smoke `node --experimental-strip-types cli/src/index.ts ignore-blast-radius 'cli/src/**' --cwd .` retorna `files_in_glob: 90` (workspace real); `'node_modules/**'` retorna 0 (exclusão funcional).
   - Deps: 2.6 — satisfeitos.
 
-- [ ] **4.4 — Fixtures** · S
-  - `cli/tests/fixtures/ignore-greenfield/` (clean)
-  - `cli/tests/fixtures/ignore-brownfield/` (preset com `ignorePatterns: ["src/old/**"]` fora dos markers)
-  - `cli/tests/fixtures/ignore-expired/` (manifest pré-populado com expired)
-  - Cada um: `_materialize.ts` + `package.json` + `tsconfig.json` + `oxlint.fast.json` + sample com violation
-  - Verify: `npx vitest run cli/tests/unit/materialize.test.ts`
-  - Deps: —
+- [x] **4.4 — Fixtures** · S
+  - `cli/tests/fixtures/ignore-greenfield/` — `package.json` (oxlint+typescript devDeps) + `tsconfig.json` + `oxlint.{fast,deep}.json` (greenfield preset shape, no markers, no `ignorePatterns`) + `src/index.ts` (clean) + `src/legacy/old-module.ts` (`debugger;` violation under `src/legacy/**` glob) + `EXPECTED.md`. Sem `.harn/qualy/ignore.json` — manifest começa vazio, exercita §10 #1 e #9.
+  - `cli/tests/fixtures/ignore-brownfield/` — mesma base + `oxlint.{fast,deep}.json` com `"ignorePatterns": ["src/old/**"]` **fora dos markers** (T3.4 import flow) + `src/index.ts` clean + `src/old/legacy.ts` violador. Sem manifest. Verify dedicado: ambos presets contêm o pattern E não contêm `_qualy:start_/end_`.
+  - `cli/tests/fixtures/ignore-expired/` — mesma base + `oxlint.{fast,deep}.json` em estado pré-compilado (markers wrappam `src/legacy/**`) + `.harn/qualy/ignore.json` com 1 entry expirada (`id: "ign-19160e"`, `glob: "src/legacy/**"`, `expires: "2025-06-01"`, `createdBy: "user"`, `createdAt: "2024-12-01T00:00:00.000Z"`) + `src/index.ts` clean + `src/legacy/old-module.ts` violador. Id confere com `generateEntryId("src/legacy/**", null)`.
+  - **Helper compartilhado:** `cli/tests/fixtures/_materialize.ts` já existia (T0); cada fixture só precisa de seu blueprint. `cpSync` recursivo copia `.harn/` automaticamente (não há filtro além de `EXPECTED.{md,json}`).
+  - **Cobertura de teste (`materialize.test.ts`):** 3 novos `it()` (16 → 19): cada um valida shape (arquivos esperados presentes, EXPECTED.md filtrado), parsing de presets (greenfield: no ignorePatterns; brownfield: pattern fora dos markers; expired: pattern dentro dos markers), e o conteúdo do manifest pré-populado (versão 1, 1 entry, fields canônicos).
+  - **Pack-contents snapshot intacto:** `cli/tests/` é excluído do tarball (`pack-contents.test.ts:56`), então fixtures não impactam o snapshot e2e.
+  - Verify: `npx vitest run cli/tests/unit/materialize.test.ts` ✓ (19/19); full unit suite 2485/2485 ✓; e2e 35/35 ✓; `npm run typecheck` ✓.
+  - Deps: — (nenhum).
 
 - [ ] **4.5 — `cli/tests/e2e/ignore-flow.test.ts`** · M
   - 12 `it()` blocks, um por SPEC §10 acceptance criterion

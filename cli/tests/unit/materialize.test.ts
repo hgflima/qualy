@@ -180,6 +180,96 @@ describe("materializeFixture", () => {
     expect(apiPkg.dependencies?.["@legacy-monorepo/core"]).toBe("workspace:*");
   });
 
+  it("works for the ignore-greenfield fixture (oxlint presets present, no manifest)", () => {
+    const fx = materializeFixture("ignore-greenfield");
+    cleanups.push(fx.cleanup);
+
+    expect(existsSync(join(fx.dir, "package.json"))).toBe(true);
+    expect(existsSync(join(fx.dir, "tsconfig.json"))).toBe(true);
+    expect(existsSync(join(fx.dir, "oxlint.fast.json"))).toBe(true);
+    expect(existsSync(join(fx.dir, "oxlint.deep.json"))).toBe(true);
+    expect(existsSync(join(fx.dir, "src", "index.ts"))).toBe(true);
+    expect(existsSync(join(fx.dir, "src", "legacy", "old-module.ts"))).toBe(true);
+    expect(existsSync(join(fx.dir, ".harn", "qualy", "ignore.json"))).toBe(false);
+    expect(existsSync(join(fx.dir, "EXPECTED.md"))).toBe(false);
+
+    const fast = JSON.parse(readFileSync(join(fx.dir, "oxlint.fast.json"), "utf8")) as {
+      ignorePatterns?: unknown;
+      overrides?: unknown;
+    };
+    expect(fast.ignorePatterns).toBeUndefined();
+    expect(fast.overrides).toBeUndefined();
+
+    const legacy = readFileSync(join(fx.dir, "src", "legacy", "old-module.ts"), "utf8");
+    expect(legacy).toMatch(/debugger;/);
+  });
+
+  it("works for the ignore-brownfield fixture (user-authored ignorePatterns outside markers)", () => {
+    const fx = materializeFixture("ignore-brownfield");
+    cleanups.push(fx.cleanup);
+
+    expect(existsSync(join(fx.dir, "oxlint.fast.json"))).toBe(true);
+    expect(existsSync(join(fx.dir, "oxlint.deep.json"))).toBe(true);
+    expect(existsSync(join(fx.dir, "src", "index.ts"))).toBe(true);
+    expect(existsSync(join(fx.dir, "src", "old", "legacy.ts"))).toBe(true);
+    expect(existsSync(join(fx.dir, ".harn", "qualy", "ignore.json"))).toBe(false);
+    expect(existsSync(join(fx.dir, "EXPECTED.md"))).toBe(false);
+
+    for (const tier of ["fast", "deep"] as const) {
+      const preset = JSON.parse(
+        readFileSync(join(fx.dir, `oxlint.${tier}.json`), "utf8"),
+      ) as { ignorePatterns?: unknown };
+      expect(Array.isArray(preset.ignorePatterns)).toBe(true);
+      const patterns = preset.ignorePatterns as readonly string[];
+      expect(patterns).toEqual(["src/old/**"]);
+      expect(patterns).not.toContain("_qualy:start_");
+      expect(patterns).not.toContain("_qualy:end_");
+    }
+  });
+
+  it("works for the ignore-expired fixture (manifest pre-populated with expired entry)", () => {
+    const fx = materializeFixture("ignore-expired");
+    cleanups.push(fx.cleanup);
+
+    expect(existsSync(join(fx.dir, "oxlint.fast.json"))).toBe(true);
+    expect(existsSync(join(fx.dir, "oxlint.deep.json"))).toBe(true);
+    expect(existsSync(join(fx.dir, ".harn", "qualy", "ignore.json"))).toBe(true);
+    expect(existsSync(join(fx.dir, "src", "legacy", "old-module.ts"))).toBe(true);
+    expect(existsSync(join(fx.dir, "EXPECTED.md"))).toBe(false);
+
+    const manifest = JSON.parse(
+      readFileSync(join(fx.dir, ".harn", "qualy", "ignore.json"), "utf8"),
+    ) as {
+      version: number;
+      entries: ReadonlyArray<{
+        id: string;
+        glob: string;
+        rule: string | null;
+        expires: string | null;
+        createdBy: string;
+      }>;
+    };
+    expect(manifest.version).toBe(1);
+    expect(manifest.entries).toHaveLength(1);
+    const [entry] = manifest.entries;
+    expect(entry?.id).toBe("ign-19160e");
+    expect(entry?.glob).toBe("src/legacy/**");
+    expect(entry?.rule).toBeNull();
+    expect(entry?.expires).toBe("2025-06-01");
+    expect(entry?.createdBy).toBe("user");
+
+    for (const tier of ["fast", "deep"] as const) {
+      const preset = JSON.parse(
+        readFileSync(join(fx.dir, `oxlint.${tier}.json`), "utf8"),
+      ) as { ignorePatterns?: readonly string[] };
+      expect(preset.ignorePatterns).toEqual([
+        "_qualy:start_",
+        "src/legacy/**",
+        "_qualy:end_",
+      ]);
+    }
+  });
+
   it("rejects fixture names with path separators", () => {
     expect(() => materializeFixture("../etc")).toThrow(/invalid fixture name/);
     expect(() => materializeFixture("foo/bar")).toThrow(/invalid fixture name/);

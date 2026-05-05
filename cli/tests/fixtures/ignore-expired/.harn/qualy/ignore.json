@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "ign-19160e",
+      "glob": "src/legacy/**",
+      "rule": null,
+      "reason": "Legacy module slated for rewrite — temporarily silenced during the migration.",
+      "expires": "2025-06-01",
+      "createdAt": "2024-12-01T00:00:00.000Z",
+      "createdBy": "user"
+    }
+  ]
+}
