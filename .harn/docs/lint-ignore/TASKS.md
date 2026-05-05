@@ -248,16 +248,19 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Files: `cli/tests/e2e/ignore-flow.test.ts` (novo, ~700 linhas).
   - Deps: 4.1, 4.2, 4.3, 4.4 + todo P2/P3 — satisfeitos.
 
-- [ ] **4.6 — README + CHANGELOG** · S
-  - README seção `## Lint Ignore` (3 exemplos: path-only, per-rule, category com confirmação)
-  - CHANGELOG entry referenciando SPEC
-  - Deps: 4.5
+- [x] **4.6 — README + CHANGELOG** · S
+  - `README.md` ganha nova seção `## Lint ignore` (entre o slash-command table e `## CLI`) com 3 exemplos canônicos (path-only, per-rule via `quality-metrics/wmc`, `category:correctness` com confirmação implícita do slash) + tabela dos 4 slash commands `/lint:ignore:*` + nota sobre drift, expired warnings e brownfield import. Link direto para `.harn/docs/lint-ignore/SPEC.md`.
+  - `Subcommand list` em `## CLI` estendido com `ignore-{add,remove,list,explain,compile,import-preview,blast-radius}` + `category-info` (8 novos verbos expostos via `index.ts:113-119,158-167`).
+  - `CHANGELOG.md` ganha bloco `[Unreleased]` (entre o cabeçalho e `[0.2.0]`) descrevendo a feature lint-ignore: CLI surface, slash commands, brownfield import, drift detection, blast-radius preview, decision-log migration. Seção `Changed` documenta `fast-glob ^3.3.3` em `dependencies` e a mudança de path do decision log nos slash commands existentes. Footer link `[Unreleased]` re-aponta para `v0.2.0...HEAD` e novo link `[0.2.0]` adicionado.
+  - **Não-edits intencionais:** README linhas 64–65 (slash table) ainda referenciam `docs/lint-decisions.md` para `/lint:rules:add` e `/lint:rules:remove` — escopo de T1.5 (slash commands `.md` + template), não T4.6. Preservado para evitar churn fora do escopo da task.
+  - Verify: `npm run typecheck` ✓; `npm test` ✓ (2485/2485); `npm run test:e2e` ✓ (50/50, inclusive `pack-contents.test.ts` que valida README.md+CHANGELOG.md no tarball).
+  - Deps: 4.5 — satisfeitos.
 
 ### ✅ Checkpoint Phase 4 (final)
 - [x] 12 acceptance criteria de SPEC §10 verdes em e2e (T4.5 — 12 numerados + 3 extras, todos green em `cli/tests/e2e/ignore-flow.test.ts`)
 - [x] `vitest run` 100% pass (2485 unit + 50 e2e — 2026-05-05)
 - [ ] Perf: `qualy audit` overhead ≤50ms em repo sem manifest (drift check skip path)
-- [ ] README + CHANGELOG atualizados
+- [x] README + CHANGELOG atualizados (T4.6 — `## Lint ignore` em README + bloco `[Unreleased]` em CHANGELOG)
 
 ---
 

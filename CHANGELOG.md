@@ -11,6 +11,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **`lint-ignore` family — auditable exclusions for paths, per-rule waivers,
+  and oxlint categories.** Source of truth at `.harn/qualy/ignore.json`
+  (qualy-managed), compiled deterministically into `oxlint.{fast,deep}.json`
+  between `_qualy:start_/_qualy:end_` markers — anything outside the markers
+  is preserved byte-for-byte. Every mutation appends a structured entry to
+  `.harn/qualy/docs/lint-decisions.md`. See
+  [`.harn/docs/lint-ignore/SPEC.md`](.harn/docs/lint-ignore/SPEC.md) for the
+  full specification (manifest schema, exit codes, §10 acceptance criteria).
+  - **CLI:** `qualy ignore-{add,remove,list,explain,compile,import-preview,blast-radius}`
+    + `qualy category-info <name>`. Path-only entries route to
+    `ignorePatterns[]`; per-rule and category entries route to `overrides[]`.
+  - **Slash commands:** `/lint:ignore:{add,remove,list,explain}`. Mandatory
+    `--reason` is captured via `AskUserQuestion`; categories pull rule counts
+    via `category-info` and require explicit acknowledgement
+    (`--i-know-this-disables-many`) before mutating.
+  - **Brownfield import.** On the first mutation, `ignorePatterns[]` already
+    present outside the markers are imported as `createdBy: "imported"`
+    entries — silent for < 5 patterns; preview + confirmation via
+    `qualy ignore-import-preview` for ≥ 5.
+  - **Drift detection in `qualy audit`.** Recompiles when manifest is newer
+    than presets; pure no-op otherwise (a handful of `stat` calls). Expired
+    entries surface as `ignore_expired` warnings on stderr — they never break
+    the build.
+  - **Blast-radius preview.** `qualy ignore-blast-radius <glob>` reports
+    `files_in_glob` + sample (excluding `node_modules`/`.git`/`dist`/`.harn`/
+    `.lint-audit`/`.lint-backup`). Used by `/lint:ignore:add` and
+    `/lint:ignore:remove` before mutating.
+- **One-time decision-log migration.** `docs/lint-decisions.md` is now stored
+  at `.harn/qualy/docs/lint-decisions.md` (alongside the ignore manifest). On
+  the first mutation by any `rules-*` / `recs-*` / `ignore-*` command, the
+  legacy file is moved automatically (git-aware) with a
+  `meta:migrate-decision-log` audit entry. Conflicts (both paths exist) abort
+  with exit `1` for manual resolution.
+
+### Changed
+
+- `dependencies` now includes `fast-glob ^3.3.3` (used by
+  `qualy ignore-blast-radius` for offline glob counting; `node:fs.glob` is
+  only stable on Node ≥ 22 and qualy targets Node ≥ 20).
+- Slash commands `/lint:rules:add`, `/lint:rules:remove`, `/lint:update` and
+  the decision-log template now reference `.harn/qualy/docs/lint-decisions.md`
+  instead of the legacy `docs/lint-decisions.md` path.
+
+---
+
 ## [0.2.0] — 2026-05-05
 
 Primeira release pós-`0.1.0` que de fato funciona após `npm install`.
@@ -170,5 +219,6 @@ recebia o path absoluto via `jsPlugins[]`. Esta release fecha ambos.
 
 ---
 
-[Unreleased]: https://github.com/hgflima/qualy/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/hgflima/qualy/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/hgflima/qualy/releases/tag/v0.2.0
 [0.1.0]: https://github.com/hgflima/qualy/releases/tag/v0.1.0

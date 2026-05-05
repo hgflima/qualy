@@ -69,6 +69,40 @@ The harness lives in `commands/lint/` and `skills/lint/SKILL.md`. Inside Claude 
 
 All slash commands surface the underlying CLI exit code (`0` ok, `1` recoverable, `2` unsupported-stack, `3` dirty-tree, `4` usage, `5` missing-dep, `70` internal — see `cli/src/lib/exit-codes.ts`) and never auto-commit.
 
+## Lint ignore
+
+For exclusions you actually want to track (legacy folders, generated code, vendored deps, per-rule waivers in specific paths), use the `/lint:ignore:*` family. Every entry has a mandatory reason, optional expiry, and is recorded in `.harn/qualy/docs/lint-decisions.md` — exclusions become auditable technical debt instead of hidden config.
+
+Source of truth is `.harn/qualy/ignore.json`. The CLI compiles entries into `oxlint.{fast,deep}.json` between `_qualy:start_/_qualy:end_` markers (path-only entries → `ignorePatterns[]`; per-rule and category entries → `overrides[]`). Anything outside the markers is preserved byte-for-byte.
+
+Three typical shapes:
+
+```bash
+# Path-only — exclude an entire folder from lint
+/lint:ignore:add 'src/legacy/**' --reason "Legacy module, rewriting in Q3" --expires 2026-09-30
+
+# Per-rule — silence one rule in a specific path, keep the rest enforced
+/lint:ignore:add 'src/generated/**' --rule quality-metrics/wmc --reason "Auto-generated code"
+
+# Category — disable a whole oxlint category in a path. The slash command
+# resolves the category size first, asks for confirmation, then injects
+# --i-know-this-disables-many automatically.
+/lint:ignore:add 'src/legacy/**' --rule category:correctness --reason "Legacy migration"
+```
+
+| Command                | What it does                                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------------------------- |
+| `/lint:ignore:add`     | Register or update an entry (path-only / per-rule / category). `--reason` mandatory.               |
+| `/lint:ignore:remove`  | Drop an entry by `(glob, rule)`. `--reason` mandatory. Ambiguous match asks for disambiguation.    |
+| `/lint:ignore:list`    | Inventory: active vs expired, days overdue, origin (`user`/`imported`), category size warnings.    |
+| `/lint:ignore:explain` | Single-entry detail + decision-log history filtered by `id`.                                       |
+
+Drift handling: `qualy audit` compares `mtime(.harn/qualy/ignore.json)` vs the presets and recompiles only when the manifest is newer. Expired entries surface as `ignore_expired` warnings on stderr — they never break the build.
+
+Brownfield import: on the first mutation, `ignorePatterns[]` already present **outside** the markers are imported as `createdBy: "imported"` entries (silent for < 5 patterns; preview + confirmation via `qualy ignore-import-preview` for ≥ 5).
+
+See [`.harn/docs/lint-ignore/SPEC.md`](.harn/docs/lint-ignore/SPEC.md) for the full specification (manifest schema, exit codes, SPEC §10 acceptance criteria).
+
 ## CLI
 
 Each slash command is a thin wrapper over a deterministic CLI. You can invoke it directly:
@@ -81,7 +115,7 @@ node --experimental-strip-types "$QUALY_CLI" status --cwd "$PWD"
 
 Contract: one JSON document on stdout per invocation, NDJSON + human messages on stderr, semantic exit codes. The CLI never asks questions — every interaction is the harness's job.
 
-Subcommand list: `detect-stack`, `detect-stage`, `detect-existing-linter`, `detect-test-runner`, `git-clean-check`, `backup-{create,list,restore}`, `install-{oxlint,hook,husky,scripts,coverage,deps}`, `audit`, `audit-latest`, `recs-{generate,blast-radius,apply}`, `rules-{list,add,remove,explain}`, `status`, `report-{data,serve,export}`, `uninstall`. Run `qualy <subcommand> --help` for details.
+Subcommand list: `detect-stack`, `detect-stage`, `detect-existing-linter`, `detect-test-runner`, `git-clean-check`, `backup-{create,list,restore}`, `install-{oxlint,hook,husky,scripts,coverage,deps}`, `audit`, `audit-latest`, `recs-{generate,blast-radius,apply}`, `rules-{list,add,remove,explain}`, `ignore-{add,remove,list,explain,compile,import-preview,blast-radius}`, `category-info`, `status`, `report-{data,serve,export}`, `uninstall`. Run `qualy <subcommand> --help` for details.
 
 ## Architecture
 
