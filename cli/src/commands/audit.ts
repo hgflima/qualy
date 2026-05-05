@@ -459,13 +459,31 @@ function normalizeDiagnostic(d: RawDiagnostic): NormalizedDiagnostic | null {
   };
 }
 
-function metricKeyFromRule(rule: string | null): MetricKey | null {
-  if (rule === null) return null;
+/**
+ * Maps an oxlint rule identifier to its canonical metric key.
+ *
+ * Accepts both shapes the audit pipeline encounters:
+ *   - `quality-metrics/<rule>`  — slash form (legacy presets, ESLint-style outputs)
+ *   - `quality-metrics(<rule>)` — parens form (oxlint 1.62.0 JSON `code` field)
+ *
+ * Without parens tolerance, real oxlint diagnostics never aggregate into
+ * `by_metric.*` (Bug B5 in PLAN.md).
+ */
+export function metricKeyFromRule(rule: string | null): MetricKey | null {
+  if (rule === null || rule === "") return null;
+  const QM_NS = "quality-metrics";
+  let tail: string | null = null;
   const slash = rule.indexOf("/");
-  if (slash === -1) return null;
-  const ns = rule.slice(0, slash);
-  if (ns !== "quality-metrics") return null;
-  const tail = rule.slice(slash + 1);
+  if (slash !== -1) {
+    if (rule.slice(0, slash) !== QM_NS) return null;
+    tail = rule.slice(slash + 1);
+  } else if (rule.endsWith(")")) {
+    const open = rule.indexOf("(");
+    if (open === -1) return null;
+    if (rule.slice(0, open) !== QM_NS) return null;
+    tail = rule.slice(open + 1, -1);
+  }
+  if (tail === null || tail === "") return null;
   return METRIC_RULE_TO_KEY[tail] ?? null;
 }
 

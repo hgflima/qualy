@@ -5,6 +5,40 @@
 
 ---
 
+## Status de execução (2026-05-05, fim da sessão)
+
+| Phase | Task | Status | Commit |
+|-------|------|--------|--------|
+| 1 | T1.1 — manifest gains `stage` field; install-oxlint writes; rules-list reads | ✅ done | `e1bad99` |
+| 1 | T1.2 — clean 6 presets (drop `_comment`, `plugins` → `jsPlugins`) | ✅ done | `1abc1ce` |
+| 1 | T1.3 — `install-oxlint` patches `jsPlugins` w/ absolute path (ADR 0012) | ✅ done | `dad7022` |
+| 2 | T2.1 — collapse halstead pair + fix `lcom` option name | ✅ done | `33f60f1` |
+| 2 | T2.2 — `METRIC_RULE_TO_KEY` + rule lists collapsed to 5 canonical rules | ✅ done | `98b9d46` |
+| 2 | T2.3 — `metricKeyFromRule` aceita `ns/rule` E `ns(rule)` | ✅ done | _(ver TASKS.md tabela de commits)_ |
+| 3 | T3.1 — substituir `@oxc-project/quality-metrics` → `quality-metrics` | ⬜ pending | — |
+| 4 | T4.1 — audit distingue `preset_invalid` de `oxlint_missing` | ⬜ pending | — |
+| 4 | T4.2 — e2e install + audit detecta violação real plantada | ⬜ pending | — |
+
+**Estado da árvore (final da sessão):**
+- `npm test` verde — 2072 testes passando (+24 novos em `audit-metric-key-from-rule.test.ts`).
+- `npm run typecheck` verde.
+- `oxlint --config oxlint.deep.json --format json .` neste repo carrega o plugin e emite diagnostics reais com `code: "quality-metrics(halstead)"` (Phase 1 + T2.1 verificadas empiricamente).
+- Phase 2 ✅ completa — `metricKeyFromRule` agora aceita ambas formas, audit já agrega em `by_metric.*`.
+- ADR 0012 mergeada (`docs/adrs/0012-oxlint-jsplugin-resolution.md`).
+
+**Bugs descobertos fora do escopo do PLAN original (já fixados):**
+- `lcom` aceita `{maxLcom}`, **não** `{max}` — corrigido em T2.1 nos 3 deep presets + nos baselines de `rules/list.ts` e `rules/explain.ts`.
+  - **Pendência conhecida:** `rules/add.ts` ainda usa `max` para lcom (writeria preset inválido). Não corrigido aqui — exigiria refactor de compound options.
+- `rules/add.ts` baseline e `KNOWN_RULES` perderam halstead (em vez de manter como max-único quebrado) — comentário no source documenta o motivo: compound options não suportadas pela UX `--max <n>`.
+- `rules/explain.ts` migrou de `_comment` → manifest stage para alinhar com `rules/list.ts` (orthogonal a T2.2 mas necessário para consistência após T1.1; checkpoint da Phase 1 garantia que `_comment` deixa de ser fonte de verdade).
+- `recs/generate.ts` `pickPresetRule` é agora metric-aware via `METRIC_OPTION_KEY` (lê `maxVolume` para halstead, `maxLcom` para lcom) — sem isso a heurística de raise/lower-threshold para halstead/lcom retornava `null`.
+
+**Pendências para retomar:**
+1. T3.1 — `rg '@oxc-project/quality-metrics' skills/lint/cli/src/` ainda retorna matches em `audit.ts:85`, `status.ts:76`, `recs/generate.ts:251,255,261`. Paralelizável; XS.
+2. T4.1 + T4.2 — Phase 4 (defesa em profundidade). Precisa de T3.1 mergeada antes do e2e fazer sentido.
+
+---
+
 ## Overview
 
 Hoje `/lint:audit --tier deep` num repo de 161 arquivos / 62k LOC reporta `errors=0, warnings=0, tooling.quality_metrics=null`. Causa raiz: **uma cadeia de 6 bugs** entre os presets estáticos, o ingestor de diagnostics do audit e os detectores de tooling. Cada bug esconde o próximo — os 4 do preset bloqueiam o oxlint de carregar; o 5º (formato `code` parens vs slash) impede o audit de agregar diagnostics mesmo se o oxlint funcionar; o 6º (nome scoped fantasma) deixa `tooling.quality_metrics` sempre null.
