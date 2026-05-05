@@ -124,20 +124,21 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Deps: 2.1, 2.2, 2.3
 
 ### ✅ Checkpoint Phase 2
-- [ ] `vitest run` verde
-- [ ] SPEC §10 acceptance #1 manual ok (greenfield: add → preset markers + manifest + decision log)
-- [ ] Re-run idempotente sem entry duplicada
+- [x] `vitest run` verde (2281/2281, re-verificado 2026-05-05)
+- [x] SPEC §10 acceptance #1 manual ok (greenfield scratch repo: `ignore-add 'src/legacy/**' --reason …` → `oxlint.{fast,deep}.json` recebem markers `_qualy:start_/_qualy:end_` envolvendo o glob, `.harn/qualy/ignore.json` criado com entry `ign-19160e` `createdBy: "user"`, decision log `.harn/qualy/docs/lint-decisions.md` com entry `ignore-add`. Lint-passa-em-arquivo-do-glob não testado in-scratch — oxlint não instalado; coberto por e2e T4.5)
+- [x] Re-run idempotente sem entry duplicada (2ª invocação mesmo glob → `action: "updated"`, manifest mantém 1 entry com mesmo id, preset inalterado em 1 marker block, decision log ganha 2ª entry `ignore-update`)
 
 ---
 
 ## Phase 3 — Per-rule + category + import + slash commands restantes
 
-- [ ] **3.1 — `lib/category-catalog.ts` (estático bundled)** · M
-  - `Record<Category, readonly string[]>` para 7 categorias (correctness, suspicious, pedantic, perf, restriction, style, nursery)
-  - Smoke test pin contra `node_modules/oxlint` major version
-  - Header doc: review trimestral manual
-  - Verify: `npx vitest run cli/tests/unit/category-catalog.test.ts`
-  - Deps: —
+- [x] **3.1 — `lib/category-catalog.ts` (estático bundled)** · M
+  - `Record<Category, readonly string[]>` para 7 categorias (correctness=231, suspicious=55, pedantic=119, perf=13, restriction=93, style=231, nursery=10) gerado a partir de `node_modules/.bin/oxlint --rules` (oxlint 1.62.0). Total: 752 entries no formato `plugin/rule-name`.
+  - `OXLINT_PINNED_MAJOR = 1`; smoke test lê `node_modules/oxlint/package.json` direto (não spawna binário) e falha se major divergir → trigger de review trimestral.
+  - Helpers exportados: `KNOWN_CATEGORIES` (tuple), `Category` type, `getCategoryRules(c)` (retorna readonly array, mesma instance — caller não muta), `getCategorySize(c)`, `isKnownCategory(name)` (type guard).
+  - Header doc cobre: por que estático (offline + determinístico), trade-off de drift, comando para regenerar (`oxlint --rules`), link para upstream `https://oxc.rs/docs/guide/usage/linter/rules.html`.
+  - Verify: `npx vitest run cli/tests/unit/category-catalog.test.ts` (27 it() blocks, all green); full suite 2273/2273 verde; `npm run typecheck` ✓.
+  - Deps: — (nenhum)
 
 - [ ] **3.2 — Extend `lib/ignore-compile.ts` (overrides + expansion)** · M
   - Entries `rule != null` → `overrides[]`
@@ -260,5 +261,6 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
 
 ## Blocked (Ralph)
 
+- Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo (stuck after 3 attempts)
 - Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo (stuck after 3 attempts)
 - Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo (stuck after 3 attempts)
