@@ -14,7 +14,7 @@ Aplica `recommendations[]` do audit mais recente **uma por vez**, com `AskUserQu
 1. **Pré-checks:** `audit-latest` (lê `.lint-audit/<ts>.json`) → idade do audit ≤ 24h → `git-clean-check` (gating: oferece `git stash` se sujo).
 2. **Iteração:** para cada `recommendations[i]` (em ordem do audit, `severity: critical` primeiro), opcional `recs-blast-radius --candidate-id <id>` antes da pergunta; `AskUserQuestion` com 3 opções fixas (Apply / Skip / Explain).
 3. **Captura de motivo:** se `type ∈ {lower-threshold, remove-rule, loosen-coverage}`, dispara segunda `AskUserQuestion` pedindo o motivo livre (1 pergunta por vez — SPEC §6).
-4. **Aplicação:** `recs-apply --rec-id <id> [--reason <text>] --strict` por rec; manifest e `docs/lint-decisions.md` são append-only via CLI.
+4. **Aplicação:** `recs-apply --rec-id <id> [--reason <text>] --strict` por rec; manifest e `.harn/qualy/docs/lint-decisions.md` são append-only via CLI.
 
 O preâmbulo `QUALY_CLI=…` está definido em `skills/lint/SKILL.md` (Resolução do CLI). Reuse-o em cada chamada Bash.
 
@@ -50,7 +50,7 @@ node --experimental-strip-types "$QUALY_CLI" <subcommand> --cwd "$PWD" "$@"
 7. **Pergunta 1 — Decisão:** `AskUserQuestion` com 3 opções: `Apply (Recommended)` / `Skip` / `Explain`. `Explain` mostra `rationale` + `evidence.top[]` e volta à pergunta.
 8. **Pergunta 2 — Motivo (condicional):** se `type ∈ {lower-threshold, remove-rule, loosen-coverage}`, dispara segunda `AskUserQuestion` pedindo o motivo (texto livre). SPEC §6 Always + Never line 423 exigem motivo registrado para qualquer afrouxamento. SEM motivo, `recs-apply` rejeita com `reason_required`.
 9. **`recs-apply --rec-id <id> [--reason <text>] --strict`** — exit `0` aplicado, `1` skipped (`applicable: false` para `enable-tier`/`fix-tooling` — roteie via `SlashCommand` ao `delegate`), `1` recoverable (`reason_required`/`preset_missing`/`config_missing`), `3` dirty tree.
-10. **Pós-condição por rec:** mostre `files_changed` e `decision.path` (`docs/lint-decisions.md`). Continue para a próxima rec até esgotar `recommendations[]`. Sem auto-commit (SPEC §6 Never line 416).
+10. **Pós-condição por rec:** mostre `files_changed` e `decision.path` (`.harn/qualy/docs/lint-decisions.md`). Continue para a próxima rec até esgotar `recommendations[]`. Sem auto-commit (SPEC §6 Never line 416).
 11. **Fechamento:** sumário final com `applied: <n>`, `skipped: <n>`, `delegated: [<list>]`. Sugira `/lint:audit` para re-medir e `/lint:report` para visualizar.
 
 ## Mapeamento de exit codes
@@ -73,7 +73,7 @@ node --experimental-strip-types "$QUALY_CLI" <subcommand> --cwd "$PWD" "$@"
 ## Verificação
 
 - Smoke: `node --experimental-strip-types "$QUALY_CLI" recs-apply --help` retorna a usage com `--rec-id` REQUIRED + `--reason`/`--audit`/`--strict`/`--cwd` opcionais.
-- E2E (PLAN §Fase 4 + SPEC §7.6): `/lint:update` num fixture com audit prévio aplica 1 rec `lower-threshold` com motivo capturado, escreve preset modificado + entry em `docs/lint-decisions.md`, e o segundo run com mesmo audit retorna `recommendation_not_found` (idempotência ao nível de manifest).
+- E2E (PLAN §Fase 4 + SPEC §7.6): `/lint:update` num fixture com audit prévio aplica 1 rec `lower-threshold` com motivo capturado, escreve preset modificado + entry em `.harn/qualy/docs/lint-decisions.md`, e o segundo run com mesmo audit retorna `recommendation_not_found` (idempotência ao nível de manifest).
 - E2E (SPEC §6 acoplamento): `/lint:update` sem `.lint-audit/` retorna exit `1` e oferece `/lint:audit` via `SlashCommand`.
 
 ## Referências

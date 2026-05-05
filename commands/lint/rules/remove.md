@@ -1,13 +1,13 @@
 ---
 name: lint:rules:remove
-description: Use when the user asks to disable a lint rule, says "/lint:rules:remove <rule>", "remove quality-metrics/dit", "desativar rule", or wants to drop a `quality-metrics/*` or `category:*` entry from the project's `oxlint.{fast,deep}.json` preset. Mutating — edits preset, appends `rule-remove` entry to `docs/lint-decisions.md`. **`--reason` is mandatory** (SPEC §6 — toda remoção precisa de motivo registrado). Confirms via `AskUserQuestion` (one question at a time) and refuses dirty trees with `--strict` (offers `git stash`). Uses `lint-installer` subagent for the write.
+description: Use when the user asks to disable a lint rule, says "/lint:rules:remove <rule>", "remove quality-metrics/dit", "desativar rule", or wants to drop a `quality-metrics/*` or `category:*` entry from the project's `oxlint.{fast,deep}.json` preset. Mutating — edits preset, appends `rule-remove` entry to `.harn/qualy/docs/lint-decisions.md`. **`--reason` is mandatory** (SPEC §6 — toda remoção precisa de motivo registrado). Confirms via `AskUserQuestion` (one question at a time) and refuses dirty trees with `--strict` (offers `git stash`). Uses `lint-installer` subagent for the write.
 allowed-tools: Bash, AskUserQuestion, SlashCommand, Read
 argument-hint: <rule> [--tier fast|deep]
 ---
 
 # /lint:rules:remove
 
-Desabilita uma rule oxlint no preset do projeto-alvo (SPEC §2 + §7.9). Mutating — edita `oxlint.fast.json` ou `oxlint.deep.json` (uma tier por chamada) e append um entry `rule-remove` em `docs/lint-decisions.md` com motivo **obrigatório** capturado pelo harness. SPEC §6 Always (line 389): toda remoção exige motivo registrado — sem motivo, `rules-remove` rejeita com `reason_required`.
+Desabilita uma rule oxlint no preset do projeto-alvo (SPEC §2 + §7.9). Mutating — edita `oxlint.fast.json` ou `oxlint.deep.json` (uma tier por chamada) e append um entry `rule-remove` em `.harn/qualy/docs/lint-decisions.md` com motivo **obrigatório** capturado pelo harness. SPEC §6 Always (line 389): toda remoção exige motivo registrado — sem motivo, `rules-remove` rejeita com `reason_required`.
 
 ## Visão Geral
 
@@ -67,7 +67,7 @@ node --experimental-strip-types "$QUALY_CLI" <subcommand> --cwd "$PWD" "$@"
 
 ## Trade-offs
 
-- **`--reason` mandatório (SPEC §6 Always line 389)**: ao contrário de `rules-add`, `rules-remove` exige motivo non-trivial. Whitespace-only ou string vazia é rejeitado pelo CLI. Trade-off: SPEC §6 line 423 enquadra remoção como afrouxamento (igual `lower-threshold`/`loosen-coverage`); o motivo cria audit-trail útil em retros e PR review (`docs/lint-decisions.md` é append-only).
+- **`--reason` mandatório (SPEC §6 Always line 389)**: ao contrário de `rules-add`, `rules-remove` exige motivo non-trivial. Whitespace-only ou string vazia é rejeitado pelo CLI. Trade-off: SPEC §6 line 423 enquadra remoção como afrouxamento (igual `lower-threshold`/`loosen-coverage`); o motivo cria audit-trail útil em retros e PR review (`.harn/qualy/docs/lint-decisions.md` é append-only).
 - **Uma tier por chamada**: igual `rules-add`. Se a rule existe em `fast` E `deep`, rode duas vezes (com motivos potencialmente diferentes — útil quando deep enforça threshold mais apertado).
 - **Idempotência por já-ausente**: `already-absent` NÃO escreve preset E NÃO append em decisions (verificado em testes). Trade-off: o usuário pode rodar `rules-remove` sem checar `rules-list` antes; o no-op é seguro e silencioso.
 - **Sem dry-run com blast radius**: remoção AFROUXA enforcement, então não há novos arquivos violando. O CLI suporta `--dry-run` (preview do `previous`) mas não `--measure-blast-radius` (sem sentido). Pergunta 2 (confirmação) substitui o blast-radius preview.
@@ -76,7 +76,7 @@ node --experimental-strip-types "$QUALY_CLI" <subcommand> --cwd "$PWD" "$@"
 ## Verificação
 
 - Smoke: `node --experimental-strip-types "$QUALY_CLI" rules-remove --help` retorna a usage com `--rule`/positional REQUIRED + `--reason` REQUIRED + `--tier`/`--dry-run`/`--strict`/`--cwd` opcionais.
-- E2E (SPEC §7.9): num fixture com `quality-metrics/cbo` ativa em deep, `/lint:rules:remove quality-metrics/cbo` (Pergunta 1: motivo `"team agreement after retro"`; Pergunta 2: Remover) → preset perde a entry, `docs/lint-decisions.md` ganha entry `rule-remove: quality-metrics/cbo: severity=error, max=8 — reason: team agreement after retro`. Segundo run → `already-absent` no-op.
+- E2E (SPEC §7.9): num fixture com `quality-metrics/cbo` ativa em deep, `/lint:rules:remove quality-metrics/cbo` (Pergunta 1: motivo `"team agreement after retro"`; Pergunta 2: Remover) → preset perde a entry, `.harn/qualy/docs/lint-decisions.md` ganha entry `rule-remove: quality-metrics/cbo: severity=error, max=8 — reason: team agreement after retro`. Segundo run → `already-absent` no-op.
 - E2E (SPEC §6 reason gate): `rules-remove --rule quality-metrics/cbo --reason "" --cwd "$PWD"` retorna exit `1` com `error: "reason_required"` mesmo com a rule presente.
 
 ## Referências

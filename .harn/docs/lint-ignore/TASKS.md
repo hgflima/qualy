@@ -34,13 +34,13 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `git grep "docs/lint-decisions.md"` só matcha `paths.ts` + `migration.ts`; `npx vitest run cli/tests/unit/{rules-add,rules-remove,recs-apply}.test.ts`
   - Deps: 1.3
 
-- [ ] **1.5 — Refs de slash commands + template** · S
+- [x] **1.5 — Refs de slash commands + template** · S
   - Substituir `docs/lint-decisions.md` → `.harn/qualy/docs/lint-decisions.md` em `commands/lint/rules/{add,remove}.md`, `commands/lint/update.md`, `cli/src/templates/lint-decisions.md.tpl:7`
   - Verify: `grep -rn "docs/lint-decisions.md" commands/` vazio; `npx vitest run cli/tests/unit/{agent-lint-installer-md,command-lint-update-md}.test.ts`
   - Deps: 1.4
 
 ### ✅ Checkpoint Phase 1
-- [ ] `npx vitest run` 100% verde
+- [x] `npx vitest run` 100% verde (2140/2140)
 - [ ] Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo
 - [ ] `.lint-manifest.json` aponta novo path
 - [ ] 2ª invocação = no-op idempotente
