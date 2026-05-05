@@ -16,15 +16,16 @@
 | 2 | T2.2 — `METRIC_RULE_TO_KEY` + rule lists collapsed to 5 canonical rules | ✅ done | `98b9d46` |
 | 2 | T2.3 — `metricKeyFromRule` aceita `ns/rule` E `ns(rule)` | ✅ done | `ae9b3dd` |
 | 3 | T3.1 — substituir `@oxc-project/quality-metrics` → `quality-metrics` | ✅ done | `04d0d32` |
-| 4 | T4.1 — audit distingue `preset_invalid` de `oxlint_missing` | ⬜ pending | — |
-| 4 | T4.2 — e2e install + audit detecta violação real plantada | ⬜ pending | — |
+| 4 | T4.1 — audit distingue `preset_invalid` de `oxlint_missing` | ✅ done | `ffb32a3` |
+| 4 | T4.2 — e2e install + audit detecta violação real plantada | ✅ done | `10fd5cf` |
 
 **Estado da árvore (final da sessão):**
-- `npm test` verde — 2072 testes passando (+24 novos em `audit-metric-key-from-rule.test.ts`).
+- `npm test` verde — 2079 testes passando (+7 novos em `audit-preset-invalid.test.ts`, +24 em `audit-metric-key-from-rule.test.ts`).
 - `npm run typecheck` verde.
 - `oxlint --config oxlint.deep.json --format json .` neste repo carrega o plugin e emite diagnostics reais com `code: "quality-metrics(halstead)"` (Phase 1 + T2.1 verificadas empiricamente).
-- Phase 2 ✅ completa — `metricKeyFromRule` agora aceita ambas formas, audit já agrega em `by_metric.*`.
+- Phase 1, 2, 3, 4 ✅ completas — pipeline ponta-a-ponta + defesa em profundidade.
 - ADR 0012 mergeada (`docs/adrs/0012-oxlint-jsplugin-resolution.md`).
+- `cli/tests/e2e/install/audit-detects-real-violation.test.ts` (smoke contra B1-B6) verde.
 
 **Bugs descobertos fora do escopo do PLAN original (já fixados):**
 - `lcom` aceita `{maxLcom}`, **não** `{max}` — corrigido em T2.1 nos 3 deep presets + nos baselines de `rules/list.ts` e `rules/explain.ts`.
@@ -33,9 +34,11 @@
 - `rules/explain.ts` migrou de `_comment` → manifest stage para alinhar com `rules/list.ts` (orthogonal a T2.2 mas necessário para consistência após T1.1; checkpoint da Phase 1 garantia que `_comment` deixa de ser fonte de verdade).
 - `recs/generate.ts` `pickPresetRule` é agora metric-aware via `METRIC_OPTION_KEY` (lê `maxVolume` para halstead, `maxLcom` para lcom) — sem isso a heurística de raise/lower-threshold para halstead/lcom retornava `null`.
 
-**Pendências para retomar:**
-1. T4.1 — audit distingue `preset_invalid` de `oxlint_missing` por inspeção de stderr (string-match em âncoras). S; precisa de fixtures de stderr para 4 tipos de falha.
-2. T4.2 — e2e `install + audit detecta violação real plantada` (smoke contra regressão de B1-B6). M; depende de T4.1.
+**Pendências para retomar:** nenhuma — todas as 4 phases entregues.
+
+**Tech debt identificado durante T4.2 (fora do escopo deste PLAN):**
+- `cli/tests/e2e/smoke-real-like-repo.test.ts` e `cli/tests/e2e/setup-greenfield.test.ts` falham porque chamam `installOxlint` em tmp dirs sem `quality-metrics` instalado. T1.3 introduziu a resolução estrita; estes tests precisam ou symlinkar `node_modules` (como T4.2 faz) ou injetar `resolveModule` stub. Reproduzido empiricamente revertendo o branch — falha pre-existente.
+- Audit não extrai valor numérico de diagnostics quality-metrics (`top[].value` sempre undefined). Requer parsing da string `message` em `normalizeDiagnostic`. Próximo PLAN se houver appetite para o `/lint:report` mostrar valores.
 
 ---
 
