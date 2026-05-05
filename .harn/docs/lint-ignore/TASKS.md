@@ -56,7 +56,7 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/ignore-manifest.test.ts` (id determinismo, upsert idempotente, expires passada, round-trip)
   - Deps: 1.1, 1.2
 
-- [ ] **2.2 — `lib/ignore-compile.ts` (path-only)** · M
+- [x] **2.2 — `lib/ignore-compile.ts` (path-only)** · M
   - `compileToPreset(currentPreset, manifest, opts) → { ok, proposed, changed }` só para `rule === null`
   - Markers + sort por id + idempotente
   - `compileToBothPresets(cwd, manifest, deps)` orquestra fast+deep
