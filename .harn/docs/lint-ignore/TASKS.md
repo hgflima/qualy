@@ -12,7 +12,7 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Exports `DECISION_LOG_PATH`, `LEGACY_DECISION_LOG_PATH`, `IGNORE_MANIFEST_PATH`, `PRESET_PATHS`, `IGNORE_MARKER_START`, `IGNORE_MARKER_END`
   - Verify: `npx vitest run cli/tests/unit/paths.test.ts`
 
-- [ ] **1.2 — Extrair `lib/decision-log.ts`** · M
+- [x] **1.2 — Extrair `lib/decision-log.ts`** · M
   - Mover `ENTRIES_START/END`, `loadOrInitDecisions`, `insertEntryBetweenMarkers`, `formatDecisionEntry` de `recs/apply.ts` (~454,487) e `rules/add.ts` (~565,582)
   - Generalizar `formatDecisionEntry({ timestamp, kind, fields, reason })` para 8 kinds
   - UPDATE imports em `rules/add.ts`, `rules/remove.ts`, `recs/apply.ts` (sem mudança de comportamento)

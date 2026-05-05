@@ -48,6 +48,7 @@ exports[`e2e: npm pack contents > snapshot of the full sorted file list 1`] = `
   "cli/src/install/update.ts",
   "cli/src/install/version.ts",
   "cli/src/lib/audit-schema.ts",
+  "cli/src/lib/decision-log.ts",
   "cli/src/lib/exit-codes.ts",
   "cli/src/lib/fs-safe.ts",
   "cli/src/lib/git.ts",

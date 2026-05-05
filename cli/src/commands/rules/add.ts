@@ -89,8 +89,10 @@ import { logger, output } from "../../lib/logger.ts";
 import {
   ENTRIES_END,
   ENTRIES_START,
+  formatDecisionEntry as formatGenericEntry,
+  insertEntryBetweenMarkers as insertEntryBetweenMarkersFromLib,
   loadOrInitDecisions,
-} from "../recs/apply.ts";
+} from "../../lib/decision-log.ts";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -562,47 +564,25 @@ function buildDecisionFields(
   };
 }
 
+/** Adapter that preserves the `DecisionFields` shape used by rules-add tests
+ *  while delegating to the generic formatter in `lib/decision-log.ts`. */
 function formatDecisionEntry(fields: DecisionFields): string {
-  return [
-    `### ${fields.timestamp} — ${fields.kind}: ${fields.subject}`,
-    "",
-    `- **kind**: ${fields.kind}`,
-    `- **rule**: ${fields.rule}`,
-    `- **author**: ${fields.author}`,
-    `- **reason**: ${fields.reason}`,
-    "",
-  ].join("\n");
+  return formatGenericEntry({
+    timestamp: fields.timestamp,
+    kind: fields.kind,
+    subject: fields.subject,
+    bullets: [
+      ["kind", fields.kind],
+      ["rule", fields.rule],
+      ["author", fields.author],
+      ["reason", fields.reason],
+    ],
+  });
 }
 
-/** Inserts `entryText` between the qualy entry markers, preserving any
- * pre-existing entries between them. Mirrors the marker discipline of
- * `recs/apply.appendEntry` but accepts pre-formatted text so callers can
- * tailor the field set for `rule-add`/`rule-remove` (no `recommendation_id`).
- */
-function insertEntryBetweenMarkers(
-  base: string,
-  entryText: string,
-): { ok: true; text: string } | { ok: false; error: string } {
-  const start = base.indexOf(ENTRIES_START);
-  const end = base.indexOf(ENTRIES_END);
-  if (start === -1 || end === -1 || start >= end) {
-    return { ok: false, error: "decisions markers missing or malformed" };
-  }
-  const startEnd = start + ENTRIES_START.length;
-  const head = base.slice(0, startEnd);
-  const middle = base.slice(startEnd, end);
-  const tail = base.slice(end);
-
-  const trimmedMiddle = middle.replace(/^\s+/, "").replace(/\s+$/, "");
-  const sep = "\n\n";
-  const newMiddle =
-    "\n" +
-    (trimmedMiddle.length > 0 ? trimmedMiddle + "\n\n" : "") +
-    entryText +
-    sep;
-
-  return { ok: true, text: head + newMiddle + tail };
-}
+/** Re-exported as a local binding so existing imports (`rules/remove.ts`,
+ *  `rules-decisions-format` test) keep their call site unchanged. */
+const insertEntryBetweenMarkers = insertEntryBetweenMarkersFromLib;
 
 // ---------------------------------------------------------------------------
 // Blast radius (dry-run only)

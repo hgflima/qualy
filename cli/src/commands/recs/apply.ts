@@ -65,6 +65,12 @@ import { dirtyFiles } from "../../lib/git.ts";
 import { parseDefensive, stringifyPretty } from "../../lib/json.ts";
 import { logger, output } from "../../lib/logger.ts";
 import { applyVitestCoverage } from "../../lib/ts-config-edit.ts";
+import {
+  appendDecisionEntry,
+  ENTRIES_END,
+  ENTRIES_START,
+  loadOrInitDecisions,
+} from "../../lib/decision-log.ts";
 
 import { auditLatest } from "../audit-latest.ts";
 
@@ -106,9 +112,6 @@ const DECISIONS_TEMPLATE = join(
   "templates",
   "lint-decisions.md.tpl",
 );
-const ENTRIES_START = "<!-- qualy:entries-start -->";
-const ENTRIES_END = "<!-- qualy:entries-end -->";
-
 const VITEST_CONFIG_CANDIDATES = [
   "vitest.config.ts",
   "vitest.config.mts",
@@ -436,79 +439,24 @@ function isoUtc(d: Date): string {
   return d.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-function formatEntry(entry: DecisionEntry): string {
-  const lines: string[] = [];
-  lines.push(`### ${entry.timestamp} — ${entry.kind}: ${entry.subject}`);
-  lines.push("");
-  lines.push(`- **kind**: ${entry.kind}`);
-  if (entry.rule !== undefined) {
-    lines.push(`- **rule**: ${entry.rule}`);
-  }
-  lines.push(`- **author**: ${entry.author}`);
-  lines.push(`- **reason**: ${entry.reason}`);
-  lines.push(`- **recommendation_id**: ${entry.recommendation_id}`);
-  lines.push("");
-  return lines.join("\n");
-}
-
-function loadOrInitDecisions(
-  current: string | null,
-  templatePath: string,
-  readFileFn: (p: string) => string | null,
-): { ok: true; text: string } | { ok: false; error: string } {
-  if (current !== null) {
-    if (
-      current.indexOf(ENTRIES_START) === -1 ||
-      current.indexOf(ENTRIES_END) === -1 ||
-      current.indexOf(ENTRIES_START) > current.indexOf(ENTRIES_END)
-    ) {
-      return {
-        ok: false,
-        error:
-          "docs/lint-decisions.md present but entry markers are missing or out of order",
-      };
-    }
-    return { ok: true, text: current };
-  }
-  const tpl = readFileFn(templatePath);
-  if (tpl === null) {
-    return {
-      ok: false,
-      error: `decisions template not found at ${templatePath}`,
-    };
-  }
-  return { ok: true, text: tpl };
-}
-
+/** Adapter over `appendDecisionEntry` that preserves the legacy
+ *  `DecisionEntry` shape (rule optional, recommendation_id appended last) so
+ *  existing tests remain byte-exact green. */
 function appendEntry(
   base: string,
   entry: DecisionEntry,
 ): { ok: true; text: string } | { ok: false; error: string } {
-  const start = base.indexOf(ENTRIES_START);
-  const end = base.indexOf(ENTRIES_END);
-  if (start === -1 || end === -1 || start >= end) {
-    return {
-      ok: false,
-      error: "decisions markers missing or malformed",
-    };
-  }
-  const startEnd = start + ENTRIES_START.length;
-  const head = base.slice(0, startEnd);
-  const middle = base.slice(startEnd, end);
-  const tail = base.slice(end);
-
-  // Preserve any whitespace already between markers, then append the new entry
-  // followed by a blank line so the next append continues to format cleanly.
-  const trimmedMiddle = middle.replace(/^\s+/, "").replace(/\s+$/, "");
-  const inserted = formatEntry(entry);
-  const sep = trimmedMiddle.length === 0 ? "\n\n" : "\n\n";
-  const newMiddle =
-    "\n" +
-    (trimmedMiddle.length > 0 ? trimmedMiddle + "\n\n" : "") +
-    inserted +
-    sep;
-
-  return { ok: true, text: head + newMiddle + tail };
+  const bullets: Array<readonly [string, string]> = [["kind", entry.kind]];
+  if (entry.rule !== undefined) bullets.push(["rule", entry.rule]);
+  bullets.push(["author", entry.author]);
+  bullets.push(["reason", entry.reason]);
+  bullets.push(["recommendation_id", entry.recommendation_id]);
+  return appendDecisionEntry(base, {
+    timestamp: entry.timestamp,
+    kind: entry.kind,
+    subject: entry.subject,
+    bullets,
+  });
 }
 
 // ---------------------------------------------------------------------------

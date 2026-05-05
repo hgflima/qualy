@@ -61,13 +61,16 @@ import { parseDefensive, stringifyPretty } from "../../lib/json.ts";
 import { logger, output } from "../../lib/logger.ts";
 
 import {
-  insertEntryBetweenMarkers,
   KNOWN_RULES,
   PRESET_FILES,
   readExistingEntry,
   type Tier,
 } from "./add.ts";
-import { loadOrInitDecisions } from "../recs/apply.ts";
+import {
+  formatDecisionEntry as formatGenericEntry,
+  insertEntryBetweenMarkers,
+  loadOrInitDecisions,
+} from "../../lib/decision-log.ts";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -289,16 +292,20 @@ function buildDecisionFields(
   };
 }
 
+/** Adapter over the generic formatter in `lib/decision-log.ts` — preserves
+ *  the byte-exact bullet order pinned by `rules-decisions-format` tests. */
 export function formatDecisionEntry(fields: DecisionFields): string {
-  const lines: string[] = [];
-  lines.push(`### ${fields.timestamp} — ${fields.kind}: ${fields.subject}`);
-  lines.push("");
-  lines.push(`- **kind**: ${fields.kind}`);
-  lines.push(`- **rule**: ${fields.rule}`);
-  lines.push(`- **author**: ${fields.author}`);
-  lines.push(`- **reason**: ${fields.reason}`);
-  lines.push("");
-  return lines.join("\n");
+  return formatGenericEntry({
+    timestamp: fields.timestamp,
+    kind: fields.kind,
+    subject: fields.subject,
+    bullets: [
+      ["kind", fields.kind],
+      ["rule", fields.rule],
+      ["author", fields.author],
+      ["reason", fields.reason],
+    ],
+  });
 }
 
 // ---------------------------------------------------------------------------
