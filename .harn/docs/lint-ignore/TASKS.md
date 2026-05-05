@@ -89,7 +89,7 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/ignore-add.test.ts`
   - Deps: 2.1, 2.2, 2.3, 1.4, 2.8
 
-- [ ] **2.5 — `commands/ignore/{list,remove,explain}.ts`** · M
+- [x] **2.5 — `commands/ignore/{list,remove,explain}.ts`** · M
   - `list` (`--expired` exit `1`/`0`, `--path`, `--json`)
   - `remove` (mandatory `--reason`, `--rule` para disambiguation; ambíguo → exit `1` `entry_ambiguous`; `--strict` recusa em working tree dirty com exit `3` DIRTY_TREE — paridade com `add` / `rules-remove`. SPEC §10 #8 lê "exit `3`")
   - `explain` (entry + history filtrado de `lint-decisions.md`; not-found → exit `1`)
@@ -97,6 +97,7 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Manifesto vazio: `list` imprime `(no entries)` exit 0; `remove`/`explain` exit `1` `entry_not_found`
   - Verify: `npx vitest run cli/tests/unit/ignore-{list,remove,explain}.test.ts`
   - Deps: 2.1, 2.2, 2.3, 2.8
+  - **Notes (Ralph 2026-05-05):** `--path <glob>` é igualdade literal (não picomatch — sem dependência adicional ainda); slot natural para `fast-glob` quando T4.3 chegar. `explain.history` parser identifica blocos por `- **id**: <id>` bullet; markers ausentes → `[]` (não erro). `--rule path` aceito como sinônimo de `null` em `remove`/`explain` para que slash command sempre passe seletor explícito.
 
 - [ ] **2.6 — Wire dispatch em `index.ts`** · S
   - 5 entries em `SUBCOMMAND_LIST` (`:78`) e `HANDLER_OVERRIDES` (`:117`): `ignore-compile`, `ignore-add`, `ignore-list`, `ignore-remove`, `ignore-explain`
