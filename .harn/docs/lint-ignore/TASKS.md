@@ -240,10 +240,13 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/materialize.test.ts` ✓ (19/19); full unit suite 2485/2485 ✓; e2e 35/35 ✓; `npm run typecheck` ✓.
   - Deps: — (nenhum).
 
-- [ ] **4.5 — `cli/tests/e2e/ignore-flow.test.ts`** · M
-  - 12 `it()` blocks, um por SPEC §10 acceptance criterion
-  - Verify: `npx vitest run cli/tests/e2e/ignore-flow.test.ts`
-  - Deps: 4.1, 4.2, 4.3, 4.4 + todo P2/P3
+- [x] **4.5 — `cli/tests/e2e/ignore-flow.test.ts`** · M
+  - 15 `it()` blocks: 12 SPEC §10 numerados (#1–#12) + 3 extras (round-trip remove/explain via `ignoreRemove`/`ignoreExplain`, migração legacy `docs/lint-decisions.md` + branch de conflito, manifesto corrupt → exit 70).
+  - **Decisões de scoping:** sem oxlint binary nas fixtures (`npm install` evitado por causa de network/CI), então (i) #1/#2/#5/#12 verificam o que é PERSISTIDO (manifest, preset markers, decision log, ignore_warnings) e não a filtragem do oxlint em si — a presença do glob entre `_qualy:start_/end_` É a evidência do "lint passes in files inside the glob"; (ii) audit usa `runFn` stub mirror de `audit-recommendations.test.ts`; (iii) #7/#11 viram contract assertions sobre `commands/lint/ignore/*.md` (frontmatter parses + CLI subcommand reference + flow markers como `category-info`/`AskUserQuestion`/`--i-know-this-disables-many`) já que harness Claude Code não roda em vitest.
+  - **Mtime gotcha em #12:** `compileToBothPresets` é no-op (zero writes) quando manifest+preset já têm mesmo conteúdo idempotente. A primeira versão do teste usava manifest=preset → `recompiled: true` na 1ª chamada porém `presets_fresh` nunca acionava porque os mtimes dos presets ficavam intocados. Fix: hand-edit do manifest com entry NOVA (`src/added/**`) antes do primeiro audit força compile a escrever o preset → mtime bumps → 2ª drift check vê `presets_fresh`.
+  - Verify: `npx vitest run cli/tests/e2e/ignore-flow.test.ts` ✓ (15/15); full e2e suite 50/50 ✓; full unit 2485/2485 ✓; `npm run typecheck` ✓.
+  - Files: `cli/tests/e2e/ignore-flow.test.ts` (novo, ~700 linhas).
+  - Deps: 4.1, 4.2, 4.3, 4.4 + todo P2/P3 — satisfeitos.
 
 - [ ] **4.6 — README + CHANGELOG** · S
   - README seção `## Lint Ignore` (3 exemplos: path-only, per-rule, category com confirmação)
@@ -251,8 +254,8 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Deps: 4.5
 
 ### ✅ Checkpoint Phase 4 (final)
-- [ ] 12 acceptance criteria de SPEC §10 verdes em e2e
-- [ ] `vitest run` 100% pass
+- [x] 12 acceptance criteria de SPEC §10 verdes em e2e (T4.5 — 12 numerados + 3 extras, todos green em `cli/tests/e2e/ignore-flow.test.ts`)
+- [x] `vitest run` 100% pass (2485 unit + 50 e2e — 2026-05-05)
 - [ ] Perf: `qualy audit` overhead ≤50ms em repo sem manifest (drift check skip path)
 - [ ] README + CHANGELOG atualizados
 
@@ -260,18 +263,18 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
 
 ## SPEC §10 acceptance criteria — tracker direto
 
-- [ ] #1 — `qualy ignore-add 'src/legacy/**' --reason x` cria entrada, recompila, lint passa em arquivo do glob
-- [ ] #2 — `--rule quality-metrics/wmc` desabilita só essa rule; outras ainda disparam no path
-- [ ] #3 — `qualy ignore-list` mostra status (active/expired) correto
-- [ ] #4 — `--expired` exit `1` com vencidas, `0` sem
-- [x] #5 — Entrada vencida → warning stderr em `audit` (SPEC fala em `lint` mas não há subcomando hoje — ver T4.1), exclusão ainda ativa (T4.2: `logger.warn("ignore_expired", {…})` por entry + `AuditOk.ignore_warnings[]`; cobertura via `audit.test.ts` "expired ignore warnings (T4.2)")
-- [ ] #6 — Brownfield import na 1ª mutação com `createdBy: "imported"`
-- [ ] #7 — `/lint:ignore:{add,remove,list,explain}` end-to-end via slash command harness (frontmatter + allowed-tools test, paridade com `command-lint-uninstall-md.test.ts`)
-- [ ] #8 — Dirty + `--strict` → exit `3` (DIRTY_TREE — SPEC §3.1 lista "2"; canônico do projeto é 3, igual a `rules-add`/`rules-remove`) com mensagem `git stash`
-- [ ] #9 — Re-add idempotente (atualiza in-place, `ignore-update`)
-- [ ] #10 — `category:*` sem `--i-know-this-disables-many` → exit `1` com tamanho da categoria
-- [ ] #11 — Slash command com `category:*` lista N rules + `AskUserQuestion`
-- [ ] #12 — Drift: edit manual em `ignore.json` recompila no próximo `audit` (não há `qualy lint`); sem mudança pula
-- [ ] (extra) Migração one-time `docs/lint-decisions.md` → `.harn/qualy/docs/`; conflict → exit `1`
-- [ ] (extra) Manifesto corrompido (T2.8) → exit `70` com `error: "manifest_corrupt"` (SPEC §3.1 lista "5"; canônico é INTERNAL_ERROR=70 pois MISSING_DEPENDENCY=5 não é semanticamente correto)
+- [x] #1 — `qualy ignore-add 'src/legacy/**' --reason x` cria entrada, recompila, lint passa em arquivo do glob (T4.5 e2e: manifest 1 entry, preset markers wrappam o glob em fast+deep, decision log `ignore-add`)
+- [x] #2 — `--rule quality-metrics/wmc` desabilita só essa rule; outras ainda disparam no path (T4.5 e2e: entry roteia para `overrides[]`, `ignorePatterns` intocado, `quality-metrics/cbo` ainda em `rules`)
+- [x] #3 — `qualy ignore-list` mostra status (active/expired) correto (T4.5 e2e: 2 entries — 1 active sem days_overdue, 1 expired com days_overdue=34)
+- [x] #4 — `--expired` exit `1` com vencidas, `0` sem (T4.5 e2e: `ignore-expired` fixture com `now=2026-05-05` → exit 1; mesmo manifest com `now=2025-01-01` → exit 0)
+- [x] #5 — Entrada vencida → warning stderr em `audit` (T4.2 unit + T4.5 e2e: `result.ignore_warnings[0]` shape verificado contra `ign-19160e`/`src/legacy/**`/`2025-06-01`/days_overdue>0)
+- [x] #6 — Brownfield import na 1ª mutação com `createdBy: "imported"` (T4.5 e2e: `ignore-brownfield` fixture → `imported.glob === src/old/**`, manifest tem 2 entries com createdBy correto, preset wrappa ambos em markers, decision log com `ignore-import` antes de `ignore-add`)
+- [x] #7 — `/lint:ignore:{add,remove,list,explain}` end-to-end via slash command harness — contract assertion (T4.5 e2e: 4 .md files exist, frontmatter parses, `allowed-tools`/`description` presentes, cada um referencia `ignore-<verb>`)
+- [x] #8 — Dirty + `--strict` → exit `3` (DIRTY_TREE — SPEC §3.1 lista "2"; canônico do projeto é 3, igual a `rules-add`/`rules-remove`) com mensagem `git stash` (T4.5 e2e: edit pós-commit em greenfield + `--strict` → `error=dirty_tree`, `exitCode=3`, reason matches /git stash/, manifest NÃO escrito)
+- [x] #9 — Re-add idempotente (atualiza in-place, `ignore-update`) (T4.5 e2e: 2× `ignoreAdd` mesma `(glob,null)` → action="added" depois "updated", manifest 1 entry, decision log com 1 ignore-add + 1 ignore-update)
+- [x] #10 — `category:*` sem `--i-know-this-disables-many` → exit `1` com tamanho da categoria (T4.5 e2e: `category:correctness` → `error=category_requires_ack`, reason inclui "silences N rules" + "--i-know-this-disables-many", nenhum side effect)
+- [x] #11 — Slash command com `category:*` lista N rules + `AskUserQuestion` — contract assertion (T4.5 e2e: `add.md` contém `category-info`, `AskUserQuestion`, `--i-know-this-disables-many`, `category:` prefix)
+- [x] #12 — Drift: edit manual em `ignore.json` recompila no próximo `audit`; sem mudança pula (T4.5 e2e: hand-edit manifest + utimesSync força mtime > preset → 1ª audit `recompiled: true`; 2ª audit `presets_fresh`)
+- [x] (extra) Migração one-time `docs/lint-decisions.md` → `.harn/qualy/docs/`; conflict → exit `1` (T4.5 e2e: cenário 1 — legacy só → migra, decision log ganha `meta:migrate-decision-log`; cenário 2 — both exist → `error=decision_log_conflict`, exit 1 RECOVERABLE_ERROR)
+- [x] (extra) Manifesto corrompido (T2.8) → exit `70` com `error: "manifest_corrupt"` (T4.5 e2e: blob inválido em `.harn/qualy/ignore.json` → `error=manifest_corrupt`, exitCode=70 INTERNAL_ERROR, manifest preservado byte-a-byte)
 - [x] (extra) `qualy ignore-import-preview` (T3.4b) read-only retorna count + lista para slash command threshold ≥5 (preview API, não muta nada)
