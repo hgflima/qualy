@@ -4,6 +4,15 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
 
 **SPEC:** `./SPEC.md` · **PLAN:** `./PLAN.md`
 
+## Cross-cutting decisions (descobertas no gap analysis 2026-05-05)
+
+- **Exit codes vs SPEC:** `cli/src/lib/exit-codes.ts` é canônico. `DIRTY_TREE = 3` (SPEC §3.1 diz "2", desatualizado). `MISSING_DEPENDENCY = 5` (SPEC §3.1 diz "fatal: manifesto corrompido = 5" — usa-se `INTERNAL_ERROR = 70` ao invés). Tasks abaixo seguem o canônico do código; SPEC é upstream e não é editado aqui.
+- **Sem `qualy lint`:** `SUBCOMMAND_LIST` não tem `lint`. Drift check + expired warnings (SPEC §10 #5/#12) entram só em `commands/audit.ts`.
+- **Node engines `>=20`:** `node:fs.glob` estável só em Node 22 — T4.3 fica em `fast-glob`.
+- **Decision-log migration silenciosa (deviation de SPEC §8.2):** SPEC §8.2 diz "Mover `docs/lint-decisions.md` → `.harn/qualy/docs/lint-decisions.md` … requer confirmação". PLAN T1.3/T1.4 implementaram silenciosa (sem prompt) para paridade com a decisão de "import silencioso até 4 patterns". Conflict (ambos existem) trava com exit `1` — esse é o único ponto que pede ação manual. Documentado aqui para evitar surpresa em revisão. Nenhuma task pendente — desvio aceito.
+- **`qualy ignore-*` unwired até T2.6:** `index.ts` não dispatcha nenhum `ignore-*`. Mesmo com T2.3 done, `qualy ignore-compile` não é invocável via CLI hoje. Smoke manual de T2.3 fica bloqueado até T2.6. Os testes unitários de `ignore-compile-cmd.test.ts` continuam verdes pois testam o handler diretamente.
+- **Marker discipline em manifest vazio:** `compileToPreset` emite `[_qualy:start_, _qualy:end_]` mesmo com `entries.length === 0` (PLAN T2.2 acceptance). `commands/ignore/compile.ts` evita isso quando manifest **inexistente** (no-op), mas escreve markers vazios quando manifest existe com 0 entries. Comportamento intencional — `ignore.json` nunca é deletado automaticamente (SPEC §6 Never line 363).
+
 ---
 
 ## Phase 1 — Foundation (chassis)
@@ -40,10 +49,12 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Deps: 1.4
 
 ### ✅ Checkpoint Phase 1
-- [x] `npx vitest run` 100% verde (2140/2140)
+- [x] `npx vitest run` 100% verde (2182/2182, re-verificado 2026-05-05)
 - [ ] Smoke manual: scratch repo com `docs/lint-decisions.md` → primeira mutação migra automaticamente, `meta:migrate-decision-log` no topo
 - [ ] `.lint-manifest.json` aponta novo path
 - [ ] 2ª invocação = no-op idempotente
+
+> **Repo state (2026-05-05):** `/Users/henriquelima/dev/personal/qualy/docs/` não contém `lint-decisions.md`. Smoke manual exige criar fixture sintético em scratch repo — não pode ser feito in-tree.
 
 ---
 
@@ -63,37 +74,52 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/ignore-compile.test.ts`
   - Deps: 2.1, 1.1
 
-- [ ] **2.3 — `commands/ignore/compile.ts`** · S
+- [x] **2.3 — `commands/ignore/compile.ts`** · S
   - `qualy ignore-compile [--check]`; `--check` → exit `1` se drift
   - Verify: `npx vitest run cli/tests/unit/ignore-compile-cmd.test.ts`
   - Deps: 2.2
 
 - [ ] **2.4 — `commands/ignore/add.ts` (path-only)** · M
   - `qualy ignore-add <glob> --reason <txt> [--expires] [--strict]`
-  - Flow: parse → migrate → load → upsert → save → compile → append decision
-  - Idempotente (re-add atualiza, kind `ignore-update`)
-  - Exit codes: 0 ok / 1 invalid / 2 dirty+strict / 4 usage
+  - Flow: parse → `migrateDecisionLogIfNeeded` → `loadIgnoreManifest` → `upsertEntry` → `saveIgnoreManifest` → `compileToBothPresets` → `appendDecisionEntry({ kind: "ignore-add" | "ignore-update" })`
+  - Idempotente (re-add com mesmo `(glob, rule)` → `action: "updated"`, kind `ignore-update`)
+  - Reuso `dirtyFiles` para `--strict` (mirror `rules-add.ts`)
+  - **Phase 2 não importa brownfield** — `add.ts` aqui assume manifest greenfield ou pre-managed. Hook de `import-on-first-mutation` é T3.4 (`lib/ignore-import.ts`). Se manifesto vazio em projeto com patterns user-authored em `oxlint.fast.json`, esses patterns são preservados byte-a-byte fora dos markers (compile T2.2 já garante isso). Importação acontece só após T3.4 wirar o hook.
+  - **Exit codes (canônicos `EXIT_CODES`):** 0 OK / 1 RECOVERABLE_ERROR (glob inválido, reason ausente, expires no passado) / 3 DIRTY_TREE (dirty + `--strict`) / 4 USAGE_ERROR / 70 INTERNAL_ERROR (manifesto corrompido — ver T2.8). **Nota:** SPEC §3.1 lista "2" para dirty+strict; segue-se a convenção do `exit-codes.ts` (DIRTY_TREE=3), igual a `rules-add` / `rules-remove`. SPEC §10 #8 deve ler "exit `3`".
   - Verify: `npx vitest run cli/tests/unit/ignore-add.test.ts`
-  - Deps: 2.1, 2.2, 2.3, 1.4
+  - Deps: 2.1, 2.2, 2.3, 1.4, 2.8
 
 - [ ] **2.5 — `commands/ignore/{list,remove,explain}.ts`** · M
   - `list` (`--expired` exit `1`/`0`, `--path`, `--json`)
-  - `remove` (mandatory `--reason`, `--rule` para disambiguation; ambíguo → exit `1`)
-  - `explain` (entry + history; not-found → exit `1`)
+  - `remove` (mandatory `--reason`, `--rule` para disambiguation; ambíguo → exit `1` `entry_ambiguous`; `--strict` recusa em working tree dirty com exit `3` DIRTY_TREE — paridade com `add` / `rules-remove`. SPEC §10 #8 lê "exit `3`")
+  - `explain` (entry + history filtrado de `lint-decisions.md`; not-found → exit `1`)
   - Surface aceita `--rule` em todos (semântica plena vem em P3)
+  - Manifesto vazio: `list` imprime `(no entries)` exit 0; `remove`/`explain` exit `1` `entry_not_found`
   - Verify: `npx vitest run cli/tests/unit/ignore-{list,remove,explain}.test.ts`
-  - Deps: 2.1, 2.2, 2.3
+  - Deps: 2.1, 2.2, 2.3, 2.8
 
 - [ ] **2.6 — Wire dispatch em `index.ts`** · S
-  - 5 entries em `SUBCOMMAND_LIST` (`:78`) e `HANDLER_OVERRIDES` (`:117`)
+  - 5 entries em `SUBCOMMAND_LIST` (`:78`) e `HANDLER_OVERRIDES` (`:117`): `ignore-compile`, `ignore-add`, `ignore-list`, `ignore-remove`, `ignore-explain`
+  - **Pode ser feita parcialmente** (`ignore-compile` sozinho) logo após T2.3 para desbloquear smoke manual; restante segue T2.4/T2.5. A acceptance final exige os 5 wirados.
+  - Imports em `index.ts`: `runIgnoreCompile` de `./commands/ignore/compile.ts` (existe); demais aguardam T2.4/T2.5.
+  - **Não há `cli/tests/unit/index-help.test.ts` hoje** (verificado 2026-05-05). PLAN.md mencionou "extend" desse teste, mas o arquivo não existe. Opções: (a) criar `cli/tests/unit/index-help.test.ts` com snapshot do `--help` output (snapshot-based vitest test) e popular com os 5 ignore-* entries; ou (b) ficar só com smoke check abaixo. Recomendação: ir com (a) só se outras tasks futuras (T3.4b, T3.5, T4.3) também adicionarem subcomandos — daí compensa. Caso contrário, smoke check basta.
   - Verify: `node --experimental-strip-types cli/src/index.ts --help | grep ignore-` (5 linhas)
-  - Deps: 2.3, 2.4, 2.5
+  - Deps: 2.3 (mínimo para wire de `ignore-compile`); 2.4, 2.5 (para wire completo)
 
 - [ ] **2.7 — Slash command `/lint:ignore:add` (path-only)** · S
   - Frontmatter + `AskUserQuestion` flow (glob → reason 4 opções → expires)
   - Refuse em stack não-suportado
   - Verify: `npx vitest run cli/tests/unit/command-lint-ignore-add-md.test.ts`
   - Deps: 2.4, 2.6
+
+- [x] **2.8 — Distinguish missing vs malformed em `loadIgnoreManifest`** · S
+  - Hoje `loadIgnoreManifest` devolve `null` para ausente, JSON inválido OU `version != 1` (silencioso). SPEC §3.1 diz "exit `5` — fatal: manifesto corrompido"; precisamos diferenciar.
+  - Mudança: trocar retorno por `LoadResult = { ok: true; manifest: IgnoreManifest | null } | { ok: false; error: "manifest_corrupt" | "manifest_unsupported_version"; reason: string }`
+  - Callers (`commands/ignore/{add,remove,list,explain,compile}.ts`) → exit `70` (INTERNAL_ERROR) com `output({ ok: false, error: "manifest_corrupt", reason })`. Nota: SPEC fala em exit 5, mas EXIT_CODES.MISSING_DEPENDENCY=5 — usa-se INTERNAL_ERROR=70 como semântico mais próximo de "fatal/corrupted state".
+  - Atualizar `cli/tests/unit/ignore-manifest.test.ts` para cobrir os 3 casos (missing → ok+null, malformed JSON → err `manifest_corrupt`, version != 1 → err `manifest_unsupported_version`).
+  - Verify: `npx vitest run cli/tests/unit/ignore-manifest.test.ts cli/tests/unit/ignore-compile-cmd.test.ts`
+  - Files: `cli/src/lib/ignore-manifest.ts`, `cli/src/commands/ignore/compile.ts` (consumir novo retorno).
+  - Deps: 2.1, 2.2, 2.3
 
 ### ✅ Checkpoint Phase 2
 - [ ] `vitest run` verde
@@ -134,14 +160,24 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/ignore-import.test.ts` (brownfield 3, greenfield 0, pre-managed 0)
   - Deps: 2.1, 2.2
 
+- [ ] **3.4b — `commands/ignore/import-preview.ts` (`qualy ignore-import-preview`)** · S
+  - Subcomando read-only: lê presets + manifest, retorna JSON `{ ok, manifest_empty, would_import: [{ glob, tier }], count }`. Sem side-effects.
+  - **Justificativa:** o slash command `/lint:ignore:add` precisa decidir se mostra `AskUserQuestion` (≥5 patterns) ANTES de invocar `qualy ignore-add`. Sem este subcomando, o slash teria que (a) duplicar a lógica de detecção em markdown ou (b) inspecionar o preset cru com Bash — ambas fragilizam o contrato. Esse subcomando expõe o "import preview" deterministicamente.
+  - Reutiliza helpers de `lib/ignore-import.ts` (T3.4) — só não escreve.
+  - Adicionar entry em `SUBCOMMAND_LIST`/`HANDLER_OVERRIDES` (1 a mais que T2.6).
+  - Verify: `npx vitest run cli/tests/unit/ignore-import-preview.test.ts` cobrindo brownfield (returns count > 0), pre-managed (count = 0), greenfield (count = 0), manifest non-empty (count = 0, skip).
+  - Files: `cli/src/commands/ignore/import-preview.ts`, test correspondente, UPDATE `cli/src/index.ts`.
+  - Deps: 3.4
+
 - [ ] **3.5 — Slash commands restantes + flow `category:*` em `add.md`** · M
   - 3 markdowns: `/lint:ignore:{remove,list,explain}`
   - `add.md` estende: `--rule category:*` → `AskUserQuestion` confirma N rules → injeta `--i-know-this-disables-many`
-  - Brownfield import threshold ≥5 → `AskUserQuestion` confirma; <5 silencioso
+  - Brownfield import threshold ≥5 → invocar `qualy ignore-import-preview` (T3.4b) antes do CLI mutativo, mostrar `AskUserQuestion` com lista das N patterns; <5 silencioso
   - `/lint:ignore:remove`: blast radius + `--reason` mandatory via `AskUserQuestion`
-  - NEW subcomando `qualy category-info <name>` (read-only) → JSON `{ category, rules, count }`
-  - Verify: `npx vitest run cli/tests/unit/command-lint-ignore-{add,remove,list,explain}-md.test.ts`
-  - Deps: 3.3, 2.7, 2.5
+  - NEW subcomando `qualy category-info <name>` (read-only) → JSON `{ category, rules, count }`. **Wire em `cli/src/index.ts`:** adicionar entry em `SUBCOMMAND_LIST` + `HANDLER_OVERRIDES` (1 a mais sobre os 5 do T2.6).
+  - Verify: `npx vitest run cli/tests/unit/command-lint-ignore-{add,remove,list,explain}-md.test.ts cli/tests/unit/category-info.test.ts`
+  - Files: 4 markdowns (`commands/lint/ignore/{add,remove,list,explain}.md`), `cli/src/commands/category-info.ts`, `cli/tests/unit/category-info.test.ts`, UPDATE `cli/src/index.ts`.
+  - Deps: 3.3, 2.7, 2.5, 3.4b
 
 ### ✅ Checkpoint Phase 3
 - [ ] SPEC §10 #2 (per-rule), #6 (brownfield import), #9 (re-add update), #10 (category sem ack), #11 (slash + category) verdes
@@ -156,6 +192,7 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - `commands/audit.ts` invoca no topo do pipeline
   - Manifest ausente → no-op
   - Log `ignore_recompile_drift` quando recompila
+  - **Nota:** SPEC §2.3 / §10 #5/#12 falam em `qualy lint` + `qualy audit`. O CLI só expõe `audit` (não há `lint` em `SUBCOMMAND_LIST`); drift check + expired warnings entram exclusivamente em `commands/audit.ts`. Se um `qualy lint` for adicionado depois (fora de v1), reaproveitar o mesmo helper.
   - Verify: `npx vitest run cli/tests/unit/{ignore-drift,audit}.test.ts`
   - Deps: 2.2, 3.2
 
@@ -167,9 +204,12 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
 
 - [ ] **4.3 — Blast radius helper** · M
   - `commands/ignore/blast-radius.ts` (subcomando `qualy ignore-blast-radius <glob>`)
-  - `node:fs.glob` ou `fast-glob`; exclui `node_modules`, `.git`, `dist`, `.harn`, `.lint-audit`, `.lint-backup`
+  - **Dependência:** `fast-glob` (Node 22+ tem `node:fs.glob` estável; mas `package.json` `engines.node = ">=20.0.0"` — ficar em `fast-glob` para compatibilidade). Adicionar a `dependencies` em `package.json`.
+  - Exclui `node_modules`, `.git`, `dist`, `.harn`, `.lint-audit`, `.lint-backup` por padrão
   - Slash commands `/lint:ignore:{add,remove}` consomem antes da confirmação
-  - Verify: `npx vitest run cli/tests/unit/ignore-blast-radius.test.ts` + smoke
+  - Output JSON `{ ok: true, cwd, files_in_glob, sample: first-10 }`
+  - **Wire em `cli/src/index.ts`:** adicionar `ignore-blast-radius` em `SUBCOMMAND_LIST` + `HANDLER_OVERRIDES`.
+  - Verify: `npx vitest run cli/tests/unit/ignore-blast-radius.test.ts` + smoke `node --experimental-strip-types cli/src/index.ts ignore-blast-radius 'cli/src/**'`
   - Deps: 2.6
 
 - [ ] **4.4 — Fixtures** · S
@@ -193,7 +233,7 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
 ### ✅ Checkpoint Phase 4 (final)
 - [ ] 12 acceptance criteria de SPEC §10 verdes em e2e
 - [ ] `vitest run` 100% pass
-- [ ] Perf: `qualy lint` overhead ≤50ms em repo sem manifest
+- [ ] Perf: `qualy audit` overhead ≤50ms em repo sem manifest (drift check skip path)
 - [ ] README + CHANGELOG atualizados
 
 ---
@@ -204,12 +244,14 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
 - [ ] #2 — `--rule quality-metrics/wmc` desabilita só essa rule; outras ainda disparam no path
 - [ ] #3 — `qualy ignore-list` mostra status (active/expired) correto
 - [ ] #4 — `--expired` exit `1` com vencidas, `0` sem
-- [ ] #5 — Entrada vencida → warning stderr em `lint`/`audit`, exclusão ainda ativa
+- [ ] #5 — Entrada vencida → warning stderr em `audit` (SPEC fala em `lint` mas não há subcomando hoje — ver T4.1), exclusão ainda ativa
 - [ ] #6 — Brownfield import na 1ª mutação com `createdBy: "imported"`
-- [ ] #7 — `/lint:ignore:{add,remove,list,explain}` end-to-end via slash command harness
-- [ ] #8 — Dirty + `--strict` → exit `2` com mensagem `git stash`
+- [ ] #7 — `/lint:ignore:{add,remove,list,explain}` end-to-end via slash command harness (frontmatter + allowed-tools test, paridade com `command-lint-uninstall-md.test.ts`)
+- [ ] #8 — Dirty + `--strict` → exit `3` (DIRTY_TREE — SPEC §3.1 lista "2"; canônico do projeto é 3, igual a `rules-add`/`rules-remove`) com mensagem `git stash`
 - [ ] #9 — Re-add idempotente (atualiza in-place, `ignore-update`)
 - [ ] #10 — `category:*` sem `--i-know-this-disables-many` → exit `1` com tamanho da categoria
 - [ ] #11 — Slash command com `category:*` lista N rules + `AskUserQuestion`
-- [ ] #12 — Drift: edit manual em `ignore.json` recompila no próximo `lint`; sem mudança pula
+- [ ] #12 — Drift: edit manual em `ignore.json` recompila no próximo `audit` (não há `qualy lint`); sem mudança pula
 - [ ] (extra) Migração one-time `docs/lint-decisions.md` → `.harn/qualy/docs/`; conflict → exit `1`
+- [ ] (extra) Manifesto corrompido (T2.8) → exit `70` com `error: "manifest_corrupt"` (SPEC §3.1 lista "5"; canônico é INTERNAL_ERROR=70 pois MISSING_DEPENDENCY=5 não é semanticamente correto)
+- [ ] (extra) `qualy ignore-import-preview` (T3.4b) read-only retorna count + lista para slash command threshold ≥5 (preview API, não muta nada)

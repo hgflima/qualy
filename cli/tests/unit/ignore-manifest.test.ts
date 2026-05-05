@@ -249,9 +249,12 @@ describe("findExpired", () => {
 });
 
 describe("loadIgnoreManifest / saveIgnoreManifest round-trip", () => {
-  it("returns null when the manifest file is absent", () => {
+  it("returns ok+manifest=null when the manifest file is absent", () => {
     const { io } = makeFakeFs();
-    expect(loadIgnoreManifest("/repo", io)).toBeNull();
+    const r = loadIgnoreManifest("/repo", io);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.manifest).toBeNull();
   });
 
   it("persists and reloads identical content; registers `kind: ignore` in the lint manifest", () => {
@@ -274,9 +277,11 @@ describe("loadIgnoreManifest / saveIgnoreManifest round-trip", () => {
     expect(r.ok).toBe(true);
 
     const loaded = loadIgnoreManifest("/repo", io);
-    expect(loaded).not.toBeNull();
-    expect(loaded?.entries).toHaveLength(1);
-    expect(loaded?.entries[0]?.glob).toBe("src/legacy/**");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.manifest).not.toBeNull();
+    expect(loaded.manifest?.entries).toHaveLength(1);
+    expect(loaded.manifest?.entries[0]?.glob).toBe("src/legacy/**");
 
     // Manifest registration: `.lint-manifest.json` records kind=ignore.
     const ent = loadManifest("/repo", io)?.entries.find(
@@ -289,18 +294,35 @@ describe("loadIgnoreManifest / saveIgnoreManifest round-trip", () => {
     expect(files.get(`/repo/${IGNORE_MANIFEST_PATH}`)).toBeDefined();
   });
 
-  it("returns null when the manifest is malformed JSON", () => {
+  it("returns error=manifest_corrupt when the manifest is malformed JSON", () => {
     const { files, io } = makeFakeFs();
     files.set(`/repo/${IGNORE_MANIFEST_PATH}`, "{not json");
-    expect(loadIgnoreManifest("/repo", io)).toBeNull();
+    const r = loadIgnoreManifest("/repo", io);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toBe("manifest_corrupt");
+    expect(r.reason).toMatch(/JSON parse failed/);
   });
 
-  it("returns null when the version is unsupported", () => {
+  it("returns error=manifest_corrupt when the manifest root is not an object (e.g. JSON array)", () => {
+    const { files, io } = makeFakeFs();
+    files.set(`/repo/${IGNORE_MANIFEST_PATH}`, "[]");
+    const r = loadIgnoreManifest("/repo", io);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toBe("manifest_corrupt");
+  });
+
+  it("returns error=manifest_unsupported_version when the version is unknown", () => {
     const { files, io } = makeFakeFs();
     files.set(
       `/repo/${IGNORE_MANIFEST_PATH}`,
       JSON.stringify({ version: 99, entries: [] }),
     );
-    expect(loadIgnoreManifest("/repo", io)).toBeNull();
+    const r = loadIgnoreManifest("/repo", io);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toBe("manifest_unsupported_version");
+    expect(r.reason).toMatch(/expected version 1/);
   });
 });

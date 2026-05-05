@@ -223,12 +223,34 @@ function isValidEntry(e: unknown): e is IgnoreEntry {
   );
 }
 
-/** Reads `.harn/qualy/ignore.json`. Returns `null` for missing/malformed/
- *  unsupported-version — callers treat that as "no manifest yet". */
+export type LoadIgnoreManifestError =
+  | "manifest_corrupt"
+  | "manifest_unsupported_version";
+
+export type LoadIgnoreManifestResult =
+  | { readonly ok: true; readonly manifest: IgnoreManifest | null }
+  | {
+      readonly ok: false;
+      readonly error: LoadIgnoreManifestError;
+      readonly reason: string;
+    };
+
+/** Reads `.harn/qualy/ignore.json` and classifies its state for callers.
+ *
+ * - File absent → `{ ok: true, manifest: null }` (no manifest yet).
+ * - JSON parse failure / non-object payload → `{ ok: false, error:
+ *   "manifest_corrupt", … }`. SPEC §3.1 wants this surfaced as a fatal
+ *   exit instead of silently treating the file as empty.
+ * - `version` mismatch → `{ ok: false, error: "manifest_unsupported_version",
+ *   … }` so future migrations have a clear failure mode.
+ * - Valid → `{ ok: true, manifest }`. Individual entries that fail
+ *   shape-validation are skipped silently (forward-compat with optional
+ *   future fields).
+ */
 export function loadIgnoreManifest(
   cwd: string,
   io: SafeIO = {},
-): IgnoreManifest | null {
+): LoadIgnoreManifestResult {
   const existsFn = io.existsFn ?? ((p: string) => existsSync(p));
   const readFileFn =
     io.readFileFn ??
@@ -240,14 +262,39 @@ export function loadIgnoreManifest(
       }
     });
   const path = join(cwd, IGNORE_MANIFEST_PATH);
-  if (!existsFn(path)) return null;
+  if (!existsFn(path)) return { ok: true, manifest: null };
   const raw = readFileFn(path);
-  if (raw === null) return null;
+  // exists() reported the file but read returned null — treat as a TOCTOU race
+  // (file removed between checks). Surface as missing rather than corrupt.
+  if (raw === null) return { ok: true, manifest: null };
   const parsed = parseDefensive<{ version?: unknown; entries?: unknown }>(raw);
-  if (!parsed.ok || parsed.value === null || typeof parsed.value !== "object") {
-    return null;
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      error: "manifest_corrupt",
+      reason: `JSON parse failed: ${parsed.error}`,
+    };
   }
-  if (parsed.value.version !== IGNORE_MANIFEST_VERSION) return null;
+  if (
+    parsed.value === null ||
+    typeof parsed.value !== "object" ||
+    Array.isArray(parsed.value)
+  ) {
+    return {
+      ok: false,
+      error: "manifest_corrupt",
+      reason: "manifest root must be a JSON object",
+    };
+  }
+  if (parsed.value.version !== IGNORE_MANIFEST_VERSION) {
+    return {
+      ok: false,
+      error: "manifest_unsupported_version",
+      reason: `expected version ${IGNORE_MANIFEST_VERSION}, got ${String(
+        parsed.value.version,
+      )}`,
+    };
+  }
   const rawEntries = Array.isArray(parsed.value.entries)
     ? (parsed.value.entries as unknown[])
     : [];
@@ -264,7 +311,10 @@ export function loadIgnoreManifest(
       createdBy: e.createdBy,
     });
   }
-  return { version: IGNORE_MANIFEST_VERSION, entries };
+  return {
+    ok: true,
+    manifest: { version: IGNORE_MANIFEST_VERSION, entries },
+  };
 }
 
 /** Writes the manifest via `safeWriteFile` so the lint-manifest registers it

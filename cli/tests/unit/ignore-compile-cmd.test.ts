@@ -182,6 +182,35 @@ describe("ignoreCompile — --check mode", () => {
   });
 });
 
+describe("ignoreCompile — manifest_corrupt", () => {
+  it("returns INTERNAL_ERROR with error=manifest_corrupt when JSON is malformed", () => {
+    const { io } = makeFakeFs({
+      [`/repo/${IGNORE_MANIFEST_PATH}`]: "{not json",
+      [`/repo/${PRESET_PATHS.fast}`]: "{}\n",
+      [`/repo/${PRESET_PATHS.deep}`]: "{}\n",
+    });
+    const r = ignoreCompile({ cwd: "/repo", check: false }, io);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toBe("manifest_corrupt");
+    expect(r.exitCode).toBe(EXIT_CODES.INTERNAL_ERROR);
+    expect(r.reason).toBeDefined();
+  });
+
+  it("returns INTERNAL_ERROR with error=manifest_unsupported_version when version is unknown", () => {
+    const { io } = makeFakeFs({
+      [`/repo/${IGNORE_MANIFEST_PATH}`]: JSON.stringify({ version: 99, entries: [] }),
+      [`/repo/${PRESET_PATHS.fast}`]: "{}\n",
+      [`/repo/${PRESET_PATHS.deep}`]: "{}\n",
+    });
+    const r = ignoreCompile({ cwd: "/repo", check: true }, io);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toBe("manifest_unsupported_version");
+    expect(r.exitCode).toBe(EXIT_CODES.INTERNAL_ERROR);
+  });
+});
+
 describe("ignoreCompile — exit codes", () => {
   it("OK when applied", () => {
     const { io } = makeFakeFs({

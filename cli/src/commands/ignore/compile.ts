@@ -59,7 +59,10 @@ export interface IgnoreCompileCheckOk {
 
 export interface IgnoreCompileErr {
   readonly ok: false;
-  readonly error: string;
+  readonly error:
+    | "manifest_corrupt"
+    | "manifest_unsupported_version"
+    | string;
   readonly reason?: string;
   readonly exitCode: ExitCode;
 }
@@ -77,10 +80,22 @@ export function ignoreCompile(
   opts: IgnoreCompileOptions,
   io: SafeIO = {},
 ): IgnoreCompileResult {
+  // Load classifies missing/corrupt/unsupported-version separately so a
+  // mangled `ignore.json` cannot be silently treated as "no manifest yet"
+  // (SPEC §3.1 — fatal exit when manifest is corrupt).
+  const loaded = loadIgnoreManifest(opts.cwd, io);
+  if (!loaded.ok) {
+    return {
+      ok: false,
+      error: loaded.error,
+      reason: loaded.reason,
+      exitCode: EXIT_CODES.INTERNAL_ERROR,
+    };
+  }
+  const manifest = loaded.manifest;
   // Absent manifest → nothing to compile. No-op (in sync, no writes).
   // SPEC §6 drift safety: only manage the manifest's lifecycle, never create
   // marker pairs in presets when the user hasn't authored any ignore.
-  const manifest = loadIgnoreManifest(opts.cwd, io);
   if (manifest === null) {
     if (opts.check) {
       return {
