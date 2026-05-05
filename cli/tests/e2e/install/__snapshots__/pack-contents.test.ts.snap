@@ -21,6 +21,7 @@ exports[`e2e: npm pack contents > snapshot of the full sorted file list 1`] = `
   "cli/src/commands/detect-test-runner.ts",
   "cli/src/commands/git-clean-check.ts",
   "cli/src/commands/ignore/add.ts",
+  "cli/src/commands/ignore/blast-radius.ts",
   "cli/src/commands/ignore/compile.ts",
   "cli/src/commands/ignore/explain.ts",
   "cli/src/commands/ignore/import-preview.ts",

@@ -151,9 +151,17 @@ describe("commands/lint/ignore/remove.md — reason mandatory + blast radius", (
 
   it("documents blast radius messaging before destructive action", () => {
     // P3 surface: verbal blast radius ("expõe novos arquivos ao lint").
-    // T4.3 will land the count + sample via `ignore-blast-radius`.
+    // T4.3 surface: real count + sample via `ignore-blast-radius`.
     const lower = TEXT.toLowerCase();
     expect(lower).toMatch(/blast.radius|exp[oõ]e .* arquivos|arquivos.*lint/);
+  });
+
+  it("invokes ignore-blast-radius before the confirmation question (T4.3)", () => {
+    // The slash must surface a real count + sample BEFORE Pergunta 2 — this
+    // is the whole point of the dedicated `ignore-blast-radius` subcommand.
+    expect(TEXT).toContain("ignore-blast-radius");
+    const lower = TEXT.toLowerCase();
+    expect(lower).toMatch(/files_in_glob|sample/);
   });
 });
 

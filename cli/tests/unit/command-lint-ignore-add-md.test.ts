@@ -141,13 +141,14 @@ describe("commands/lint/ignore/add.md — Resolução do CLI preamble", () => {
 describe("commands/lint/ignore/add.md — CLI subcommand coverage (Phase 3)", () => {
   // Phase 3 flow consults: detect-stack (refuse), git-clean-check (--strict
   // gate), ignore-import-preview (≥5 brownfield import threshold — T3.4b),
-  // category-info (category-rule blast radius — T3.5), ignore-add (mutating
-  // write).
+  // category-info (category-rule blast radius — T3.5), ignore-blast-radius
+  // (path-glob blast radius — T4.3), ignore-add (mutating write).
   const SUBCOMMANDS = [
     "detect-stack",
     "git-clean-check",
     "ignore-import-preview",
     "category-info",
+    "ignore-blast-radius",
     "ignore-add",
   ] as const;
 

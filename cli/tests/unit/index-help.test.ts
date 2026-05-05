@@ -11,6 +11,7 @@ describe("CLI subcommand registry", () => {
       "ignore-remove",
       "ignore-explain",
       "ignore-import-preview",
+      "ignore-blast-radius",
       "category-info",
     ] as const;
 
@@ -32,6 +33,9 @@ describe("CLI subcommand registry", () => {
     expect(byName.get("ignore-explain")?.toLowerCase()).toContain("explain");
     expect(byName.get("ignore-import-preview")?.toLowerCase()).toMatch(
       /preview|import/,
+    );
+    expect(byName.get("ignore-blast-radius")?.toLowerCase()).toMatch(
+      /blast|count|sample|files/,
     );
     expect(byName.get("category-info")?.toLowerCase()).toMatch(/categor/);
   });
@@ -62,6 +66,7 @@ describe("CLI subcommand registry", () => {
         "ignore-remove",
         "ignore-explain",
         "ignore-import-preview",
+        "ignore-blast-radius",
         "category-info",
       ]) {
         writes.length = 0;

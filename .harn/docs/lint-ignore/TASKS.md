@@ -218,15 +218,17 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/audit.test.ts` ✓ (33/33, 4 novos T4.2); full unit suite 2459/2459 ✓; e2e 35/35 ✓; `npm run typecheck` ✓.
   - Deps: 4.1, 2.1 — satisfeitos.
 
-- [ ] **4.3 — Blast radius helper** · M
-  - `commands/ignore/blast-radius.ts` (subcomando `qualy ignore-blast-radius <glob>`)
-  - **Dependência:** `fast-glob` (Node 22+ tem `node:fs.glob` estável; mas `package.json` `engines.node = ">=20.0.0"` — ficar em `fast-glob` para compatibilidade). Adicionar a `dependencies` em `package.json`.
-  - Exclui `node_modules`, `.git`, `dist`, `.harn`, `.lint-audit`, `.lint-backup` por padrão
-  - Slash commands `/lint:ignore:{add,remove}` consomem antes da confirmação
-  - Output JSON `{ ok: true, cwd, files_in_glob, sample: first-10 }`
-  - **Wire em `cli/src/index.ts`:** adicionar `ignore-blast-radius` em `SUBCOMMAND_LIST` + `HANDLER_OVERRIDES`.
-  - Verify: `npx vitest run cli/tests/unit/ignore-blast-radius.test.ts` + smoke `node --experimental-strip-types cli/src/index.ts ignore-blast-radius 'cli/src/**'`
-  - Deps: 2.6
+- [x] **4.3 — Blast radius helper** · M
+  - `cli/src/commands/ignore/blast-radius.ts`: subcomando `qualy ignore-blast-radius <glob>` (também aceita `--glob`). Pure handler `ignoreBlastRadius(opts, deps)` com `globFn` injetável (default = `fastGlob.sync`). Output `{ ok, cwd, glob, files_in_glob, sample }`. `BLAST_RADIUS_SAMPLE_LIMIT = 10` exportado; `--limit <N>` override (positivos só; ≤0 ou NaN cai pro default).
+  - **Exclusões hardcoded** (`BLAST_RADIUS_EXCLUDES`): `**/node_modules/**`, `**/.git/**`, `**/dist/**`, `**/.harn/**`, `**/.lint-audit/**`, `**/.lint-backup/**`. Lista travada por test (`expect(BLAST_RADIUS_EXCLUDES).toEqual([...])`) — drift futuro vira ruído visível.
+  - **Dependência:** `fast-glob ^3.3.3` adicionada a `dependencies` em `package.json` (Node 22+ tem `node:fs.glob` estável mas `engines.node = ">=20.0.0"` — `fast-glob` é o caminho compatível). `package-lock.json` regenerado.
+  - **Validação:** glob vazio / whitespace-only → exit `1` `invalid_glob` (`RECOVERABLE_ERROR`); glob driver não é chamado (zero syscalls). Glob é trimado antes de passar pra fast-glob (paridade com a string que a entry vai gravar no manifesto). `--limit 0` / non-numeric → exit `4` USAGE_ERROR via parser. Resultado não-array do `globFn` (lying fake) é coerced para 0 sem crash.
+  - **Wire:** `cli/src/index.ts` ganha `runIgnoreBlastRadius` import + entrada em `SUBCOMMAND_LIST` (entre `ignore-import-preview` e `category-info`) + `HANDLER_OVERRIDES`. `cli/tests/unit/index-help.test.ts` (3 it() blocks) atualizado.
+  - **Slash commands integration (T4.3 acceptance):** `commands/lint/ignore/remove.md` Pergunta 2 invoca `ignore-blast-radius <glob>` e mostra `files_in_glob` + sample no preâmbulo de confirmação. `commands/lint/ignore/add.md` ganha passo 8 ("Blast radius") antes da Aplicação (passo 9), mantendo `<= 130` linhas. Trade-off "verbal em P3" reescrito para citar T4.3 já entregue.
+  - **Test coverage (`ignore-blast-radius.test.ts`, 18 it() blocks):** parser × 9 (positional, `--glob`, `--cwd`, `--limit` ok/zero/nan, --bogus, --help, missing glob, --glob vence positional), happy path × 3 (count>0, count=0, trim whitespace), sample limit × 3 (default cap 10, override, fallback p/ default em ≤0/NaN), exclusion × 2 (forwarded, snapshot), validation × 2 (empty/whitespace), defensive × 1 (non-array result). Os 4 contract tests existentes (`command-lint-ignore-{add,remove}-md`) ganharam cláusulas T4.3.
+  - Snapshot `pack-contents.test.ts.snap` refrescado com `cli/src/commands/ignore/blast-radius.ts`.
+  - Verify: `npm run typecheck` ✓; `npm test` ✓ (2482 unit, +21 da T4.3); `npm run test:e2e` ✓ (35/35); smoke `node --experimental-strip-types cli/src/index.ts ignore-blast-radius 'cli/src/**' --cwd .` retorna `files_in_glob: 90` (workspace real); `'node_modules/**'` retorna 0 (exclusão funcional).
+  - Deps: 2.6 — satisfeitos.
 
 - [ ] **4.4 — Fixtures** · S
   - `cli/tests/fixtures/ignore-greenfield/` (clean)
