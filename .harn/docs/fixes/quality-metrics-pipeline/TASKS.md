@@ -348,6 +348,7 @@
 | `33f60f1` | T2.1 | collapse halstead pair + fix lcom option name |
 | `98b9d46` | T2.2 | `METRIC_RULE_TO_KEY` + rule lists collapsed to 5 canonical rules |
 | `ae9b3dd` | T2.3 | `metricKeyFromRule` aceita parens form (`ns(rule)`) + 24 unit tests |
+| `04d0d32` | T3.1 | TRACKED_PACKAGES e rec messages: `@oxc-project/quality-metrics` → `quality-metrics` |
 
 ## Referências
 

@@ -15,7 +15,7 @@
 | 2 | T2.1 — collapse halstead pair + fix `lcom` option name | ✅ done | `33f60f1` |
 | 2 | T2.2 — `METRIC_RULE_TO_KEY` + rule lists collapsed to 5 canonical rules | ✅ done | `98b9d46` |
 | 2 | T2.3 — `metricKeyFromRule` aceita `ns/rule` E `ns(rule)` | ✅ done | `ae9b3dd` |
-| 3 | T3.1 — substituir `@oxc-project/quality-metrics` → `quality-metrics` | ✅ done | _(commit desta sessão — ver TASKS.md)_ |
+| 3 | T3.1 — substituir `@oxc-project/quality-metrics` → `quality-metrics` | ✅ done | `04d0d32` |
 | 4 | T4.1 — audit distingue `preset_invalid` de `oxlint_missing` | ⬜ pending | — |
 | 4 | T4.2 — e2e install + audit detecta violação real plantada | ⬜ pending | — |
 
