@@ -50,9 +50,9 @@ describe("commands/lint/ignore/add.md — file hygiene", () => {
     expect(TEXT.charCodeAt(0)).not.toBe(0xfeff);
   });
 
-  it("is at most 100 lines (parity with /lint:rules:add)", () => {
+  it("is at most 130 lines (Phase 3 added rule/category/import flows)", () => {
     const lines = TEXT.split("\n").length;
-    expect(lines).toBeLessThanOrEqual(100);
+    expect(lines).toBeLessThanOrEqual(130);
   });
 });
 
@@ -138,10 +138,18 @@ describe("commands/lint/ignore/add.md — Resolução do CLI preamble", () => {
   });
 });
 
-describe("commands/lint/ignore/add.md — CLI subcommand coverage (Phase 2)", () => {
-  // Path-only flow consults: detect-stack (refuse), git-clean-check
-  // (--strict gate), ignore-add (mutating write).
-  const SUBCOMMANDS = ["detect-stack", "git-clean-check", "ignore-add"] as const;
+describe("commands/lint/ignore/add.md — CLI subcommand coverage (Phase 3)", () => {
+  // Phase 3 flow consults: detect-stack (refuse), git-clean-check (--strict
+  // gate), ignore-import-preview (≥5 brownfield import threshold — T3.4b),
+  // category-info (category-rule blast radius — T3.5), ignore-add (mutating
+  // write).
+  const SUBCOMMANDS = [
+    "detect-stack",
+    "git-clean-check",
+    "ignore-import-preview",
+    "category-info",
+    "ignore-add",
+  ] as const;
 
   for (const cmd of SUBCOMMANDS) {
     it(`mentions subcommand: ${cmd}`, () => {
@@ -157,12 +165,26 @@ describe("commands/lint/ignore/add.md — CLI subcommand coverage (Phase 2)", ()
     expect(TEXT).toMatch(/\.harn\/qualy\/docs\/lint-decisions\.md/);
   });
 
-  it("does NOT wire --rule yet (path-only Phase 2 — SPEC §3.1)", () => {
-    // T3.3 will introduce per-rule semantics; the Phase 2 surface must
-    // not promise it. The flag string can be mentioned only in a
-    // forward-looking note, never as an active step.
+  it("wires --rule with quality-metrics + category options (Phase 3 — T3.3 + T3.5)", () => {
     const fluxo = TEXT.split("## Fluxo")[1]?.split("## Trade-offs")[0] ?? "";
-    expect(fluxo).not.toMatch(/--rule\s+\S/);
+    // Phase 3 surface must promise per-rule (quality-metrics/<rule>) AND
+    // category (category:<name>) variants in the flow body.
+    expect(fluxo).toMatch(/--rule/);
+    expect(fluxo).toMatch(/quality-metrics/);
+    expect(fluxo).toMatch(/category:/);
+  });
+
+  it("documents the category acknowledgement flag (SPEC §3.1.1)", () => {
+    expect(TEXT).toMatch(/--i-know-this-disables-many/);
+  });
+
+  it("documents the brownfield import threshold (≥5 — T3.4b)", () => {
+    // The slash command must call ignore-import-preview before the mutating
+    // `ignore-add`, gating an AskUserQuestion at the ≥5 patterns threshold
+    // (SPEC §8.2 deferred resolution).
+    const lower = TEXT.toLowerCase();
+    expect(lower).toMatch(/ignore-import-preview/);
+    expect(TEXT).toMatch(/[\s>]5\b|\b5 patterns/);
   });
 });
 

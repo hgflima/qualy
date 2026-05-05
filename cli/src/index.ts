@@ -22,6 +22,7 @@ import { runAuditLatest } from "./commands/audit-latest.ts";
 import { runBackupCreate } from "./commands/backup/create.ts";
 import { runBackupList } from "./commands/backup/list.ts";
 import { runBackupRestore } from "./commands/backup/restore.ts";
+import { runCategoryInfo } from "./commands/category-info.ts";
 import { runDetectExistingLinter } from "./commands/detect-existing-linter.ts";
 import { runDetectStack } from "./commands/detect-stack.ts";
 import { runDetectStage } from "./commands/detect-stage.ts";
@@ -114,6 +115,7 @@ const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> =
   ["ignore-remove", "Remove an ignore entry (--reason required) and recompile presets"],
   ["ignore-explain", "Explain an ignore entry: details + decision-log history"],
   ["ignore-import-preview", "Preview brownfield patterns that would import on next ignore mutation"],
+  ["category-info", "Resolve an oxlint category to its rules + count (read-only)"],
   ["status", "Aggregate versions, presets, stage, hooks, coverage, theme"],
   ["report-data", "Aggregate audit + history + coverage + git into report JSON"],
   ["report-serve", "Serve the visual report on 127.0.0.1 (long-running)"],
@@ -128,6 +130,7 @@ const SUBCOMMAND_LIST: ReadonlyArray<readonly [name: string, summary: string]> =
  */
 const HANDLER_OVERRIDES: ReadonlyMap<string, Handler> = new Map<string, Handler>([
   ["audit", runAudit],
+  ["category-info", runCategoryInfo],
   ["audit-latest", runAuditLatest],
   ["backup-create", runBackupCreate],
   ["backup-list", runBackupList],

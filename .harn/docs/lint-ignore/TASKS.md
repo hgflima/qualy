@@ -181,15 +181,16 @@ Checklist executável derivado de `PLAN.md`. Marque conforme avança. Cada task 
   - Verify: `npx vitest run cli/tests/unit/ignore-import-preview.test.ts` ✓ (14 it() blocks: parser × 4, brownfield × 2, pre-managed, greenfield × 3, manifest non-empty, corrupt × 2, read-only); full suite 2335 ✓; e2e 35/35 ✓; `npm run typecheck` ✓.
   - Deps: 3.4 — satisfeitos.
 
-- [ ] **3.5 — Slash commands restantes + flow `category:*` em `add.md`** · M
-  - 3 markdowns: `/lint:ignore:{remove,list,explain}`
-  - `add.md` estende: `--rule category:*` → `AskUserQuestion` confirma N rules → injeta `--i-know-this-disables-many`
-  - Brownfield import threshold ≥5 → invocar `qualy ignore-import-preview` (T3.4b) antes do CLI mutativo, mostrar `AskUserQuestion` com lista das N patterns; <5 silencioso
-  - `/lint:ignore:remove`: blast radius + `--reason` mandatory via `AskUserQuestion`
-  - NEW subcomando `qualy category-info <name>` (read-only) → JSON `{ category, rules, count }`. **Wire em `cli/src/index.ts`:** adicionar entry em `SUBCOMMAND_LIST` + `HANDLER_OVERRIDES` (1 a mais sobre os 5 do T2.6).
-  - Verify: `npx vitest run cli/tests/unit/command-lint-ignore-{add,remove,list,explain}-md.test.ts cli/tests/unit/category-info.test.ts`
-  - Files: 4 markdowns (`commands/lint/ignore/{add,remove,list,explain}.md`), `cli/src/commands/category-info.ts`, `cli/tests/unit/category-info.test.ts`, UPDATE `cli/src/index.ts`.
-  - Deps: 3.3, 2.7, 2.5, 3.4b
+- [x] **3.5 — Slash commands restantes + flow `category:*` em `add.md`** · M
+  - 3 markdowns novos (`commands/lint/ignore/{list,explain,remove}.md`) seguindo o padrão SPEC §4.1: frontmatter completo, 6 seções canônicas (Visão Geral / Quando usar / Quando NÃO usar / Fluxo / Trade-offs / Verificação), preâmbulo `QUALY_CLI`, mapeamento de exit codes.
+  - `add.md` estendido: descreve `--rule path-only|quality-metrics/<rule>|category:<name>|opaque` no fluxo, com `category:*` consultando `category-info <name>` para listar N rules e injetando `--i-know-this-disables-many` após `AskUserQuestion` (SPEC §3.1.1). Brownfield import threshold ≥5 chama `ignore-import-preview` antes do CLI mutativo (SPEC §8.2 deferred resolution). Limite de linhas movido de 100 → 130 para acomodar o flow expandido.
+  - `/lint:ignore:list`: read-only inventário, surfacing `category_size` (`⚠ category (N rules)`) e routing opcional para `add`/`remove` quando `expired_count > 0` ou manifesto vazio. Pós-condition `AskUserQuestion` só dispara se a ação fizer sentido.
+  - `/lint:ignore:explain`: read-only inspector com branch de ambiguity (`entry_ambiguous` → `AskUserQuestion` candidatos → re-roda com `--rule <id>`/`--rule path`). History extraído filtra blocos do decision log por `id`.
+  - `/lint:ignore:remove`: mutating com `--reason` mandatory via `AskUserQuestion` (SPEC §6 Always), Pergunta 1 (motivo) → Pergunta 2 (confirm com blast-radius verbal — count real chega em T4.3 `ignore-blast-radius`). Branch ambiguity simétrico ao explain.
+  - NEW subcomando `qualy category-info <category>` (`cli/src/commands/category-info.ts`): read-only resolver sobre `KNOWN_CATEGORIES` retornando `{ category, rules, count }`. Aceita bare (`correctness`) e qualificado (`category:correctness`). Unknown → exit `1` `unknown_category` com lista canônica em `reason`. Wired em `SUBCOMMAND_LIST` + `HANDLER_OVERRIDES`. `cli/tests/unit/category-info.test.ts` (15 it() blocks: resolution × 4, rejection × 3, parser × 8) ✓.
+  - 4 contract tests (`command-lint-ignore-{list,explain,remove,add}-md.test.ts`): hygiene (LF, no BOM, single trailing newline) + frontmatter (name, description-cue, allowed-tools, argument-hint) + sections-in-order + CLI subcommand coverage + exit-code mapping + global conventions. `add.md` test atualizado: T3.3+T3.5 wire `--rule` (era assertion negativa em P2), `--i-know-this-disables-many`, `ignore-import-preview`, `category-info`. `index-help.test.ts` (3 it() blocks) atualizado para incluir `category-info` no registro + summary contract + non-stub guard. Snapshot `pack-contents.test.ts.snap` refrescado com `cli/src/commands/category-info.ts` + `commands/lint/ignore/{explain,list,remove}.md`.
+  - Verify: `npx vitest run cli/tests/unit/command-lint-ignore-{add,list,explain,remove}-md.test.ts cli/tests/unit/category-info.test.ts cli/tests/unit/index-help.test.ts` ✓ (155 it() blocks); full unit suite 2442 ✓; e2e 35/35 ✓ (snapshot refrescado); `npm run typecheck` ✓.
+  - Deps: 3.3, 2.7, 2.5, 3.4b — satisfeitos.
 
 ### ✅ Checkpoint Phase 3
 - [ ] SPEC §10 #2 (per-rule), #6 (brownfield import), #9 (re-add update), #10 (category sem ack), #11 (slash + category) verdes

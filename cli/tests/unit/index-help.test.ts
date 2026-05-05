@@ -11,6 +11,7 @@ describe("CLI subcommand registry", () => {
       "ignore-remove",
       "ignore-explain",
       "ignore-import-preview",
+      "category-info",
     ] as const;
 
     for (const name of expected) {
@@ -32,6 +33,7 @@ describe("CLI subcommand registry", () => {
     expect(byName.get("ignore-import-preview")?.toLowerCase()).toMatch(
       /preview|import/,
     );
+    expect(byName.get("category-info")?.toLowerCase()).toMatch(/categor/);
   });
 
   it("ignore-* handlers do not return the not_implemented stub error", async () => {
@@ -60,6 +62,7 @@ describe("CLI subcommand registry", () => {
         "ignore-remove",
         "ignore-explain",
         "ignore-import-preview",
+        "category-info",
       ]) {
         writes.length = 0;
         await run([name, "--help"]);
