@@ -39,11 +39,20 @@ function fsDeps(fs: FakeFS): RulesExplainDeps {
   };
 }
 
+function manifestWithStage(stage: string): string {
+  return JSON.stringify({
+    version: "1",
+    created_at: "2026-01-01T00:00:00.000Z",
+    updated_at: "2026-01-01T00:00:00.000Z",
+    stage,
+    entries: [],
+  });
+}
+
 function greenfieldDeepPreset(): string {
   return JSON.stringify({
-    _comment: "qualy preset · stage=greenfield · tier=deep",
     categories: { correctness: "error", suspicious: "warn" },
-    plugins: ["quality-metrics"],
+    jsPlugins: ["quality-metrics"],
     rules: {
       "quality-metrics/wmc": ["error", { max: 15 }],
       "quality-metrics/cbo": ["error", { max: 8 }],
@@ -53,9 +62,8 @@ function greenfieldDeepPreset(): string {
 
 function brownfieldDeepPreset(): string {
   return JSON.stringify({
-    _comment: "qualy preset · stage=brownfield-moderate · tier=deep",
     categories: { correctness: "error" },
-    plugins: ["quality-metrics"],
+    jsPlugins: ["quality-metrics"],
     rules: {
       "quality-metrics/wmc": ["error", { max: 20 }],
       "quality-metrics/cbo": ["error", { max: 10 }],
@@ -67,7 +75,6 @@ function brownfieldDeepPreset(): string {
 
 function greenfieldFastPreset(): string {
   return JSON.stringify({
-    _comment: "qualy preset · stage=greenfield · tier=fast",
     categories: { correctness: "error", suspicious: "warn" },
   });
 }
@@ -77,14 +84,15 @@ function greenfieldFastPreset(): string {
 // ---------------------------------------------------------------------------
 
 describe("catalogedRules — coverage", () => {
-  it("includes all 6 quality-metrics rules", () => {
+  it("includes all 5 quality-metrics rules (halstead is one compound rule)", () => {
     const cat = catalogedRules();
     expect(cat).toContain("quality-metrics/wmc");
-    expect(cat).toContain("quality-metrics/halstead-volume");
-    expect(cat).toContain("quality-metrics/halstead-effort");
+    expect(cat).toContain("quality-metrics/halstead");
     expect(cat).toContain("quality-metrics/lcom");
     expect(cat).toContain("quality-metrics/cbo");
     expect(cat).toContain("quality-metrics/dit");
+    expect(cat).not.toContain("quality-metrics/halstead-volume");
+    expect(cat).not.toContain("quality-metrics/halstead-effort");
   });
 
   it("includes oxlint correctness and suspicious categories", () => {
@@ -102,6 +110,7 @@ describe("rulesExplain — current state from preset", () => {
   it("returns ok with current threshold matching project's deep preset", () => {
     const fs: FakeFS = {
       files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("greenfield"),
         [pathJoin(ROOT, "oxlint.deep.json")]: greenfieldDeepPreset(),
       },
     };
@@ -122,6 +131,7 @@ describe("rulesExplain — current state from preset", () => {
   it("provides default_for_stage matching the detected stage baseline", () => {
     const fs: FakeFS = {
       files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("brownfield-moderate"),
         [pathJoin(ROOT, "oxlint.deep.json")]: brownfieldDeepPreset(),
       },
     };
@@ -168,12 +178,11 @@ describe("rulesExplain — current state from preset", () => {
     // Synthetic: rule exists only in fast tier
     const fs: FakeFS = {
       files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("greenfield"),
         [pathJoin(ROOT, "oxlint.fast.json")]: JSON.stringify({
-          _comment: "stage=greenfield · tier=fast",
           rules: { "quality-metrics/cbo": ["warn", { max: 6 }] },
         }),
         [pathJoin(ROOT, "oxlint.deep.json")]: JSON.stringify({
-          _comment: "stage=greenfield · tier=deep",
           categories: { correctness: "error" },
         }),
       },
@@ -187,7 +196,7 @@ describe("rulesExplain — current state from preset", () => {
     expect(r.current?.origin).toBe("preset:greenfield:fast");
   });
 
-  it("origin lacks stage tag when _comment has no stage=", () => {
+  it("origin lacks stage tag when manifest has no stage", () => {
     const fs: FakeFS = {
       files: {
         [pathJoin(ROOT, "oxlint.deep.json")]: JSON.stringify({
@@ -250,11 +259,11 @@ describe("rulesExplain — current=null paths", () => {
     expect(r.current_source).toBe("preset_malformed");
   });
 
-  it("returns current=null when rule is absent but preset stage still resolves default_for_stage", () => {
+  it("returns current=null when rule is absent but manifest stage still resolves default_for_stage", () => {
     const fs: FakeFS = {
       files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("legacy"),
         [pathJoin(ROOT, "oxlint.deep.json")]: JSON.stringify({
-          _comment: "qualy preset · stage=legacy · tier=deep",
           categories: { correctness: "warn" },
           rules: {},
         }),

@@ -92,9 +92,17 @@ const PRESET_FILES = {
 
 type Tier = keyof typeof PRESET_FILES;
 
-/** Quality-metrics rule prefix → schema metric key. */
+/**
+ * Quality-metrics rule prefix → schema metric key.
+ *
+ * Legacy aliases (`halstead-volume`, `halstead-effort`) remain so audits
+ * persisted under the old preset (separate rules per Halstead axis) still
+ * aggregate into `by_metric.halstead`. The plugin's actual rule name is
+ * `halstead` with `{ maxVolume, maxEffort }` options (Q1 in PLAN.md).
+ */
 const METRIC_RULE_TO_KEY: Record<string, MetricKey> = {
   wmc: "wmc",
+  halstead: "halstead",
   "halstead-volume": "halstead",
   "halstead-effort": "halstead",
   lcom: "lcom",

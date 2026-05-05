@@ -40,6 +40,7 @@ import {
   type Stage,
 } from "../../lib/audit-schema.ts";
 import { EXIT_CODES, type ExitCode } from "../../lib/exit-codes.ts";
+import { loadManifest } from "../../lib/fs-safe.ts";
 import { parseDefensive } from "../../lib/json.ts";
 import { logger, output } from "../../lib/logger.ts";
 
@@ -63,7 +64,13 @@ export interface CurrentRuleState {
 export interface DefaultForStage {
   readonly stage: Stage;
   readonly severity: RuleSeverity;
-  readonly max: number;
+  /** Single-axis threshold for wmc/cbo/dit. */
+  readonly max?: number;
+  /** lcom-specific option key. */
+  readonly maxLcom?: number;
+  /** halstead pair (compound rule). */
+  readonly maxVolume?: number;
+  readonly maxEffort?: number;
 }
 
 export interface RulesExplainOk {
@@ -120,22 +127,13 @@ const CATALOG: Readonly<Record<string, CatalogEntry>> = {
       "Empirical studies (Basili, Briand & Melo 1996; Subramanyam & Krishnan 2003) link WMC > ~20 to a 2–3× increase in defect density. The greenfield threshold (15) is conservative; brownfield (20) accepts existing code; legacy (40, warn) signals without blocking.",
     links: QM_LINKS,
   },
-  "quality-metrics/halstead-volume": {
+  "quality-metrics/halstead": {
     category: "quality-metrics",
-    title: "Halstead Volume",
+    title: "Halstead Volume + Effort",
     description:
-      "Program size derived from operator/operand counts: V = (N1+N2) * log2(n1+n2). Larger volume means more tokens to read.",
+      "Two information-theoretic size metrics for a function: Volume V = (N1+N2)·log2(n1+n2) (token count), and Effort E = D·V (volume × difficulty). The rule fires when either exceeds its cap.",
     rationale:
-      "Halstead's information-theoretic measure correlates with reading effort. Volume > 1000 in a single function or module begins to exceed working-memory budgets typical in code review (Miller's 7±2, scaled).",
-    links: QM_LINKS,
-  },
-  "quality-metrics/halstead-effort": {
-    category: "quality-metrics",
-    title: "Halstead Effort",
-    description:
-      "Estimated mental effort to comprehend a unit: E = D * V (difficulty × volume). Approximates programmer time.",
-    rationale:
-      "Halstead's effort metric tracks comprehension cost. Greenfield caps at 300 to keep functions reviewable in a single pass; legacy at 1000 flags units that should be a refactor target rather than blocked.",
+      "Halstead's measures correlate with reading and comprehension cost. Volume caps protect against units that exceed working-memory budgets typical in review (Miller's 7±2, scaled); Effort caps flag units that should be a refactor target. Configured via `{ maxVolume, maxEffort }`.",
     links: QM_LINKS,
   },
   "quality-metrics/lcom": {
@@ -189,30 +187,35 @@ const CATALOG: Readonly<Record<string, CatalogEntry>> = {
 // Stage baseline (mirror of `rules-list` STAGE_BASELINE_DEEP — keep in sync)
 // ---------------------------------------------------------------------------
 
+interface BaselineRule {
+  readonly severity: RuleSeverity;
+  readonly max?: number;
+  readonly maxLcom?: number;
+  readonly maxVolume?: number;
+  readonly maxEffort?: number;
+}
+
 const STAGE_BASELINE_DEEP: Readonly<
-  Record<Stage, Readonly<Record<string, { severity: RuleSeverity; max: number }>>>
+  Record<Stage, Readonly<Record<string, BaselineRule>>>
 > = {
   greenfield: {
     "quality-metrics/wmc": { severity: "error", max: 15 },
-    "quality-metrics/halstead-volume": { severity: "warn", max: 800 },
-    "quality-metrics/halstead-effort": { severity: "warn", max: 300 },
-    "quality-metrics/lcom": { severity: "warn", max: 0 },
+    "quality-metrics/halstead": { severity: "warn", maxVolume: 800, maxEffort: 300 },
+    "quality-metrics/lcom": { severity: "warn", maxLcom: 0 },
     "quality-metrics/cbo": { severity: "error", max: 8 },
     "quality-metrics/dit": { severity: "warn", max: 4 },
   },
   "brownfield-moderate": {
     "quality-metrics/wmc": { severity: "error", max: 20 },
-    "quality-metrics/halstead-volume": { severity: "warn", max: 1000 },
-    "quality-metrics/halstead-effort": { severity: "warn", max: 500 },
-    "quality-metrics/lcom": { severity: "warn", max: 2 },
+    "quality-metrics/halstead": { severity: "warn", maxVolume: 1000, maxEffort: 400 },
+    "quality-metrics/lcom": { severity: "warn", maxLcom: 2 },
     "quality-metrics/cbo": { severity: "error", max: 10 },
     "quality-metrics/dit": { severity: "warn", max: 5 },
   },
   legacy: {
     "quality-metrics/wmc": { severity: "warn", max: 40 },
-    "quality-metrics/halstead-volume": { severity: "warn", max: 2000 },
-    "quality-metrics/halstead-effort": { severity: "warn", max: 1000 },
-    "quality-metrics/lcom": { severity: "warn", max: 4 },
+    "quality-metrics/halstead": { severity: "warn", maxVolume: 2000, maxEffort: 1000 },
+    "quality-metrics/lcom": { severity: "warn", maxLcom: 4 },
     "quality-metrics/cbo": { severity: "warn", max: 20 },
     "quality-metrics/dit": { severity: "warn", max: 6 },
   },
@@ -230,7 +233,6 @@ const PRESET_FILES = {
 type Tier = keyof typeof PRESET_FILES;
 
 interface PresetShape {
-  readonly _comment?: unknown;
   readonly categories?: unknown;
   readonly rules?: unknown;
 }
@@ -239,19 +241,14 @@ function isSeverity(s: unknown): s is RuleSeverity {
   return s === "error" || s === "warn" || s === "off";
 }
 
-function readStageFromComment(raw: unknown): Stage | null {
-  if (typeof raw !== "string") return null;
-  const m = raw.match(/stage=([a-z-]+)/i);
-  if (!m) return null;
-  const candidate = m[1];
-  if (
-    candidate === "greenfield" ||
-    candidate === "brownfield-moderate" ||
-    candidate === "legacy"
-  ) {
-    return candidate;
-  }
-  return null;
+function readStageFromManifest(
+  cwd: string,
+  existsFn: (p: string) => boolean,
+  readFileFn: (p: string) => string | null,
+): Stage | null {
+  const manifest = loadManifest(cwd, { existsFn, readFileFn });
+  if (!manifest || manifest.stage === undefined) return null;
+  return manifest.stage;
 }
 
 interface FoundEntry {
@@ -306,10 +303,10 @@ function scanPresets(
   existsFn: (p: string) => boolean,
   readFileFn: (p: string) => string | null,
 ): PresetScanResult {
+  const stageFromManifest = readStageFromManifest(cwd, existsFn, readFileFn);
   let anyPresent = false;
   let presentCount = 0;
   let malformedCount = 0;
-  let detectedStage: Stage | null = null;
   let found: FoundEntry | null = null;
 
   for (const tier of ["fast", "deep"] as const) {
@@ -332,12 +329,15 @@ function scanPresets(
       malformedCount++;
       continue;
     }
-    const stage = readStageFromComment(preset._comment);
-    if (detectedStage === null && stage !== null) detectedStage = stage;
     if (found === null) {
       const hit = lookupRuleInPreset(preset, rule);
       if (hit !== null) {
-        found = { tier, stage, severity: hit.severity, ...(hit.options ? { options: hit.options } : {}) };
+        found = {
+          tier,
+          stage: stageFromManifest,
+          severity: hit.severity,
+          ...(hit.options ? { options: hit.options } : {}),
+        };
       }
     }
   }
@@ -349,9 +349,9 @@ function scanPresets(
     return { stage: null, found: null, source: "preset_malformed" };
   }
   if (found === null) {
-    return { stage: detectedStage, found: null, source: "rule_absent_from_presets" };
+    return { stage: stageFromManifest, found: null, source: "rule_absent_from_presets" };
   }
-  return { stage: detectedStage, found, source: "preset_lookup_ok" };
+  return { stage: stageFromManifest, found, source: "preset_lookup_ok" };
 }
 
 function buildCurrent(found: FoundEntry): CurrentRuleState {
@@ -372,7 +372,14 @@ function defaultForStage(rule: string, stage: Stage | null): DefaultForStage | n
   if (stage === null) return null;
   const baseline = STAGE_BASELINE_DEEP[stage][rule];
   if (baseline === undefined) return null;
-  return { stage, severity: baseline.severity, max: baseline.max };
+  return {
+    stage,
+    severity: baseline.severity,
+    ...(baseline.max !== undefined ? { max: baseline.max } : {}),
+    ...(baseline.maxLcom !== undefined ? { maxLcom: baseline.maxLcom } : {}),
+    ...(baseline.maxVolume !== undefined ? { maxVolume: baseline.maxVolume } : {}),
+    ...(baseline.maxEffort !== undefined ? { maxEffort: baseline.maxEffort } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------

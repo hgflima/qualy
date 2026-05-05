@@ -54,14 +54,12 @@ function greenfieldDeepPreset(): string {
 
 function brownfieldDeepPreset(): string {
   return JSON.stringify({
-    _comment: "qualy preset · stage=brownfield-moderate · tier=deep",
     categories: { correctness: "error" },
-    plugins: ["quality-metrics"],
+    jsPlugins: ["quality-metrics"],
     rules: {
       "quality-metrics/wmc": ["error", { max: 20 }],
-      "quality-metrics/halstead-volume": ["warn", { max: 1000 }],
-      "quality-metrics/halstead-effort": ["warn", { max: 500 }],
-      "quality-metrics/lcom": ["warn", { max: 2 }],
+      "quality-metrics/halstead": ["warn", { maxVolume: 1000, maxEffort: 400 }],
+      "quality-metrics/lcom": ["warn", { maxLcom: 2 }],
       "quality-metrics/cbo": ["error", { max: 10 }],
       "quality-metrics/dit": ["warn", { max: 5 }],
       // explicitly disabled by user
@@ -229,15 +227,16 @@ describe("rulesList — available[] computed from stage baseline", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const availableRules = r.available.map((a) => a.rule);
-    expect(availableRules).toContain("quality-metrics/halstead-volume");
-    expect(availableRules).toContain("quality-metrics/halstead-effort");
+    expect(availableRules).toContain("quality-metrics/halstead");
     expect(availableRules).toContain("quality-metrics/lcom");
     expect(availableRules).toContain("quality-metrics/dit");
     expect(availableRules).not.toContain("quality-metrics/wmc");
     expect(availableRules).not.toContain("quality-metrics/cbo");
+    expect(availableRules).not.toContain("quality-metrics/halstead-volume");
+    expect(availableRules).not.toContain("quality-metrics/halstead-effort");
   });
 
-  it("carries suggested_severity, suggested_max, source from baseline", () => {
+  it("carries suggested_severity, suggested_max_lcom, source from baseline", () => {
     const fs: FakeFS = {
       files: {
         [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("greenfield"),
@@ -251,7 +250,27 @@ describe("rulesList — available[] computed from stage baseline", () => {
     expect(lcom).toEqual({
       rule: "quality-metrics/lcom",
       suggested_severity: "warn",
-      suggested_max: 0,
+      suggested_max_lcom: 0,
+      source: "baseline:greenfield:deep",
+    });
+  });
+
+  it("emits suggested_max_volume and suggested_max_effort for halstead", () => {
+    const fs: FakeFS = {
+      files: {
+        [pathJoin(ROOT, ".lint-manifest.json")]: manifestWithStage("greenfield"),
+        [pathJoin(ROOT, "oxlint.deep.json")]: greenfieldDeepPreset(),
+      },
+    };
+    const r = rulesList({ cwd: ROOT }, fsDeps(fs));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const halstead = r.available.find((a) => a.rule === "quality-metrics/halstead");
+    expect(halstead).toEqual({
+      rule: "quality-metrics/halstead",
+      suggested_severity: "warn",
+      suggested_max_volume: 800,
+      suggested_max_effort: 300,
       source: "baseline:greenfield:deep",
     });
   });
@@ -289,7 +308,7 @@ describe("rulesList — available[] computed from stage baseline", () => {
     const r = rulesList({ cwd: ROOT }, fsDeps(fs));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.available.length).toBe(6);
+    expect(r.available.length).toBe(5);
     expect(r.available.every((a) => a.source === "baseline:legacy:deep")).toBe(true);
   });
 
@@ -318,7 +337,7 @@ describe("rulesList — available[] computed from stage baseline", () => {
     const r = rulesList({ cwd: ROOT }, fsDeps(fs));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    // brownfield baseline has all 6 quality-metrics; preset enables all 6
+    // brownfield baseline has 5 quality-metrics rules; preset enables all 5
     expect(r.available).toEqual([]);
   });
 });

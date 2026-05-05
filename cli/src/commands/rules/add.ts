@@ -192,43 +192,42 @@ interface BaselineRule {
   readonly max: number;
 }
 
+/**
+ * Baseline thresholds for rules `rules-add` can write a `{max: N}` entry for.
+ * Halstead is intentionally absent because the plugin requires a compound
+ * `{ maxVolume, maxEffort }` option object — the rules-add UX only gathers a
+ * single `--max <n>`. Halstead is always part of the preset by default
+ * (install-oxlint), so users normally don't need to add it; tightening a
+ * single axis must be done via direct preset edit until rules-add gains
+ * compound-option support.
+ */
 const STAGE_BASELINE_DEEP: Readonly<
   Record<Stage, Readonly<Record<string, BaselineRule>>>
 > = {
   greenfield: {
     "quality-metrics/wmc": { severity: "error", max: 15 },
-    "quality-metrics/halstead-volume": { severity: "warn", max: 800 },
-    "quality-metrics/halstead-effort": { severity: "warn", max: 300 },
     "quality-metrics/lcom": { severity: "warn", max: 0 },
     "quality-metrics/cbo": { severity: "error", max: 8 },
     "quality-metrics/dit": { severity: "warn", max: 4 },
   },
   "brownfield-moderate": {
     "quality-metrics/wmc": { severity: "error", max: 20 },
-    "quality-metrics/halstead-volume": { severity: "warn", max: 1000 },
-    "quality-metrics/halstead-effort": { severity: "warn", max: 500 },
     "quality-metrics/lcom": { severity: "warn", max: 2 },
     "quality-metrics/cbo": { severity: "error", max: 10 },
     "quality-metrics/dit": { severity: "warn", max: 5 },
   },
   legacy: {
     "quality-metrics/wmc": { severity: "warn", max: 40 },
-    "quality-metrics/halstead-volume": { severity: "warn", max: 2000 },
-    "quality-metrics/halstead-effort": { severity: "warn", max: 1000 },
     "quality-metrics/lcom": { severity: "warn", max: 4 },
     "quality-metrics/cbo": { severity: "warn", max: 20 },
     "quality-metrics/dit": { severity: "warn", max: 6 },
   },
 };
 
-/** Catalog of rules `rules-add` knows how to validate against. Mirrors
- * `rules-explain` CATALOG keys (kept inline to avoid a circular import — that
- * module exports `catalogedRules()` but pulling it would import the entire
- * argv parser surface). */
+/** Catalog of rules `rules-add` knows how to validate against. Halstead is
+ *  intentionally omitted (compound options — see STAGE_BASELINE_DEEP doc). */
 const KNOWN_RULES: ReadonlySet<string> = new Set<string>([
   "quality-metrics/wmc",
-  "quality-metrics/halstead-volume",
-  "quality-metrics/halstead-effort",
   "quality-metrics/lcom",
   "quality-metrics/cbo",
   "quality-metrics/dit",

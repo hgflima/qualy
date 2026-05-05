@@ -122,7 +122,7 @@ const METRIC_KEYS: readonly MetricKey[] = ["cbo", "dit", "halstead", "lcom", "wm
 
 const METRIC_RULE_NAME: Readonly<Record<MetricKey, string>> = {
   wmc: "quality-metrics/wmc",
-  halstead: "quality-metrics/halstead-volume",
+  halstead: "quality-metrics/halstead",
   lcom: "quality-metrics/lcom",
   cbo: "quality-metrics/cbo",
   dit: "quality-metrics/dit",
@@ -171,11 +171,30 @@ interface RulePick {
 }
 
 /**
+ * Map metric → the option key that holds the user-facing threshold for the
+ * `quality-metrics/<metric>` rule. Halstead uses `maxVolume` (the larger axis;
+ * `max_seen_volume` is the parallel field on the audit side). Lcom uses
+ * `maxLcom`. The rest use the bare `max`.
+ */
+const METRIC_OPTION_KEY: Readonly<Record<MetricKey, string>> = {
+  wmc: "max",
+  halstead: "maxVolume",
+  lcom: "maxLcom",
+  cbo: "max",
+  dit: "max",
+};
+
+/**
  * Pick the preset entry for `rule`. If both fast and deep carry it, prefer
  * deep (heuristics §6.1). Skips user-override entries (heuristics §7.2).
- * Returns `null` when the rule isn't preset-active or carries no `max`.
+ * Returns `null` when the rule isn't preset-active or carries no threshold
+ * option (under the metric-specific option key).
  */
-function pickPresetRule(rules: readonly RuleActive[], rule: string): RulePick | null {
+function pickPresetRule(
+  rules: readonly RuleActive[],
+  rule: string,
+  metric: MetricKey,
+): RulePick | null {
   let fastPick: RulePick | null = null;
   let deepPick: RulePick | null = null;
 
@@ -184,7 +203,7 @@ function pickPresetRule(rules: readonly RuleActive[], rule: string): RulePick | 
     if (!isPresetOrigin(entry.origin)) continue;
     const tier = tierFromOrigin(entry.origin);
     if (tier === null) continue;
-    const max = readMaxOption(entry);
+    const max = readMaxOption(entry, metric);
     if (max === null) continue;
     const pick: RulePick = { entry, tier, currentMax: max };
     if (tier === "deep") {
@@ -197,8 +216,9 @@ function pickPresetRule(rules: readonly RuleActive[], rule: string): RulePick | 
   return deepPick ?? fastPick;
 }
 
-function readMaxOption(entry: RuleActive): number | null {
-  const raw = entry.options?.["max"];
+function readMaxOption(entry: RuleActive, metric: MetricKey): number | null {
+  const key = METRIC_OPTION_KEY[metric];
+  const raw = entry.options?.[key];
   return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
 }
 
@@ -366,7 +386,7 @@ function generateRaiseThreshold(audit: AuditPayload): Candidate[] {
 
   for (const metric of METRIC_KEYS) {
     const ruleName = METRIC_RULE_NAME[metric];
-    const pick = pickPresetRule(audit.rules_active, ruleName);
+    const pick = pickPresetRule(audit.rules_active, ruleName, metric);
     if (pick === null) continue;
     const { violations, max_seen } = readMetricStats(audit, metric);
     if (violations !== 0) continue;
@@ -418,7 +438,7 @@ function generateLowerThreshold(audit: AuditPayload): Candidate[] {
 
   for (const metric of METRIC_KEYS) {
     const ruleName = METRIC_RULE_NAME[metric];
-    const pick = pickPresetRule(audit.rules_active, ruleName);
+    const pick = pickPresetRule(audit.rules_active, ruleName, metric);
     if (pick === null) continue;
     const { violations, max_seen } = readMetricStats(audit, metric);
     if (violations < 5) continue;

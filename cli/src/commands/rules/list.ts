@@ -58,7 +58,13 @@ export interface RulesListOptions {
 export interface AvailableRule {
   readonly rule: string;
   readonly suggested_severity: RuleSeverity;
+  /** Single-number threshold for wmc/cbo/dit. */
   readonly suggested_max?: number;
+  /** lcom-specific option key. */
+  readonly suggested_max_lcom?: number;
+  /** halstead pair (compound rule). */
+  readonly suggested_max_volume?: number;
+  readonly suggested_max_effort?: number;
   readonly source: string;
 }
 
@@ -92,31 +98,34 @@ export interface RulesListDeps {
 interface BaselineRule {
   readonly rule: string;
   readonly severity: RuleSeverity;
-  readonly max: number;
+  /** Single-axis threshold (wmc, cbo, dit). */
+  readonly max?: number;
+  /** lcom-specific option (the plugin schema rejects bare `max`). */
+  readonly maxLcom?: number;
+  /** halstead pair (compound rule). */
+  readonly maxVolume?: number;
+  readonly maxEffort?: number;
 }
 
 const STAGE_BASELINE_DEEP: Readonly<Record<Stage, readonly BaselineRule[]>> = {
   greenfield: [
     { rule: "quality-metrics/wmc", severity: "error", max: 15 },
-    { rule: "quality-metrics/halstead-volume", severity: "warn", max: 800 },
-    { rule: "quality-metrics/halstead-effort", severity: "warn", max: 300 },
-    { rule: "quality-metrics/lcom", severity: "warn", max: 0 },
+    { rule: "quality-metrics/halstead", severity: "warn", maxVolume: 800, maxEffort: 300 },
+    { rule: "quality-metrics/lcom", severity: "warn", maxLcom: 0 },
     { rule: "quality-metrics/cbo", severity: "error", max: 8 },
     { rule: "quality-metrics/dit", severity: "warn", max: 4 },
   ],
   "brownfield-moderate": [
     { rule: "quality-metrics/wmc", severity: "error", max: 20 },
-    { rule: "quality-metrics/halstead-volume", severity: "warn", max: 1000 },
-    { rule: "quality-metrics/halstead-effort", severity: "warn", max: 500 },
-    { rule: "quality-metrics/lcom", severity: "warn", max: 2 },
+    { rule: "quality-metrics/halstead", severity: "warn", maxVolume: 1000, maxEffort: 400 },
+    { rule: "quality-metrics/lcom", severity: "warn", maxLcom: 2 },
     { rule: "quality-metrics/cbo", severity: "error", max: 10 },
     { rule: "quality-metrics/dit", severity: "warn", max: 5 },
   ],
   legacy: [
     { rule: "quality-metrics/wmc", severity: "warn", max: 40 },
-    { rule: "quality-metrics/halstead-volume", severity: "warn", max: 2000 },
-    { rule: "quality-metrics/halstead-effort", severity: "warn", max: 1000 },
-    { rule: "quality-metrics/lcom", severity: "warn", max: 4 },
+    { rule: "quality-metrics/halstead", severity: "warn", maxVolume: 2000, maxEffort: 1000 },
+    { rule: "quality-metrics/lcom", severity: "warn", maxLcom: 4 },
     { rule: "quality-metrics/cbo", severity: "warn", max: 20 },
     { rule: "quality-metrics/dit", severity: "warn", max: 6 },
   ],
@@ -292,7 +301,10 @@ function computeAvailable(
     out.push({
       rule: b.rule,
       suggested_severity: b.severity,
-      suggested_max: b.max,
+      ...(b.max !== undefined ? { suggested_max: b.max } : {}),
+      ...(b.maxLcom !== undefined ? { suggested_max_lcom: b.maxLcom } : {}),
+      ...(b.maxVolume !== undefined ? { suggested_max_volume: b.maxVolume } : {}),
+      ...(b.maxEffort !== undefined ? { suggested_max_effort: b.maxEffort } : {}),
       source: `baseline:${stage}:deep`,
     });
   }

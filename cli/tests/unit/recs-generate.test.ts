@@ -73,21 +73,15 @@ function brownfieldDeepRules(): RuleActive[] {
   return [
     { rule: "quality-metrics/wmc", severity: "error", options: { max: 20 }, origin },
     {
-      rule: "quality-metrics/halstead-volume",
+      rule: "quality-metrics/halstead",
       severity: "warn",
-      options: { max: 1000 },
-      origin,
-    },
-    {
-      rule: "quality-metrics/halstead-effort",
-      severity: "warn",
-      options: { max: 400 },
+      options: { maxVolume: 1000, maxEffort: 400 },
       origin,
     },
     {
       rule: "quality-metrics/lcom",
       severity: "warn",
-      options: { max: 2 },
+      options: { maxLcom: 2 },
       origin,
     },
     { rule: "quality-metrics/cbo", severity: "error", options: { max: 10 }, origin },
