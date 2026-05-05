@@ -11,7 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [0.2.0] — 2026-05-05
+
+Primeira release pós-`0.1.0` que de fato funciona após `npm install`.
+`0.1.0` ficou no CHANGELOG mas nunca foi publicada como tag — dois bugs
+mascarados a tornavam não-executável: (a) `--experimental-strip-types`
+recusa código TypeScript dentro de `node_modules/`, e (b) o pipeline
+`quality-metrics` referenciava o pacote por nome errado e o oxlint não
+recebia o path absoluto via `jsPlugins[]`. Esta release fecha ambos.
 
 ### Fixed
 
@@ -23,6 +30,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tornava `@hgflima/qualy@0.1.0` não-executável após `npm install` ou `npx`
   (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`). Ver
   [ADR 0011](./docs/adrs/0011-tsx-runtime.md).
+- **Pipeline `quality-metrics` integrado ao oxlint funciona end-to-end.**
+  Conjunto de fixes do `fixes/quality-metrics-pipeline` (Phase 1–4):
+  - `T1.1` — manifest passa a registrar `stage` (greenfield /
+    brownfield-moderate / brownfield-legacy); `install-oxlint` escreve
+    o campo, `rules-list` lê dele.
+  - `T1.2` — presets descartam `_comment` (rejeitado pelo oxlint) e
+    trocam `plugins` por `jsPlugins` (forma esperada pelo runtime).
+  - `T1.3` / **ADR 0012** — `install-oxlint` resolve o pacote
+    `quality-metrics` via `require.resolve` e patcha o caminho absoluto
+    em `jsPlugins[]` no momento do write (presets ficam em
+    `node_modules/`, oxlint só aceita path absoluto).
+  - `T2.1` / `T2.2` — `oxlint.deep.json` colapsa o par `halstead-*` num
+    único `quality-metrics/halstead-*` (5 rules canônicas) e corrige
+    `lcom` option name.
+  - `T2.3` — `metricKeyFromRule` aceita a forma `ns(rule)` (com
+    parênteses) emitida por algumas versões do oxlint.
+  - `T3.1` — referência ao pacote troca de `@oxc-project/quality-metrics`
+    para `quality-metrics` (npm name oficial).
+  - `T4.1` — `audit` distingue `preset_invalid` de `oxlint_missing`
+    (mensagens diferentes; exit codes preservados).
+  - `T4.2` — e2e cobre install + audit detectando uma violação WMC real,
+    travando regressão de toda a cadeia.
 
 ### Changed
 
@@ -37,7 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `devDependencies` — o que mascarava `ERR_MODULE_NOT_FOUND` por trás do
   bug primário de strip-types.
 - **`scripts.build` (noop) atualiza a justificativa** para refletir tsx
-  no lugar de strip-types. Sigue sem build step real (`echo … && exit 0`).
+  no lugar de strip-types. Segue sem build step real (`echo … && exit 0`).
 
 ### Added
 
@@ -45,6 +74,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `npm pack` + `npm install <tarball>` em tmpdir e executa o binário
   publicado (`./node_modules/.bin/qualy --version` e
   `qualy install --scope local --dry-run`). Trava a regressão do bug acima.
+- ADRs **0010** (npm distribution rationale), **0011** (tsx runtime),
+  **0012** (jsPlugins absolute-path resolution).
 
 ---
 
