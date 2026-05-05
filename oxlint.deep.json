@@ -14,22 +14,17 @@
         "max": 20
       }
     ],
-    "quality-metrics/halstead-volume": [
+    "quality-metrics/halstead": [
       "warn",
       {
-        "max": 1000
-      }
-    ],
-    "quality-metrics/halstead-effort": [
-      "warn",
-      {
-        "max": 400
+        "maxVolume": 1000,
+        "maxEffort": 400
       }
     ],
     "quality-metrics/lcom": [
       "warn",
       {
-        "max": 2
+        "maxLcom": 2
       }
     ],
     "quality-metrics/cbo": [

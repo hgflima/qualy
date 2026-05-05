@@ -29,7 +29,13 @@ const PRESETS_DIR = join(
 );
 
 type Severity = "error" | "warn" | "off";
-type RuleEntry = Severity | [Severity, { max: number }];
+type RuleOptions = {
+  max?: number;
+  maxVolume?: number;
+  maxEffort?: number;
+  maxLcom?: number;
+};
+type RuleEntry = Severity | [Severity, RuleOptions];
 
 interface OxlintPreset {
   $schema: string;
@@ -51,37 +57,53 @@ function loadPreset(stage: Stage, tier: Tier): OxlintPreset {
   return JSON.parse(raw) as OxlintPreset;
 }
 
+type ExpectedRule =
+  | { kind: "single-max"; severity: Severity; max: number }
+  | { kind: "lcom"; severity: Severity; maxLcom: number }
+  | { kind: "halstead"; severity: Severity; maxVolume: number; maxEffort: number };
+
 /**
  * SPEC §3 thresholds table — the single source of truth this suite locks.
- * Any change to the table MUST land here AND in the preset JSONs together.
+ * `halstead` is now a single rule with `{ maxVolume, maxEffort }` options
+ * (the plugin exports it that way; halstead-volume / halstead-effort don't
+ * exist as separate rules).
  */
-const EXPECTED_DEEP_RULES: Record<
-  Stage,
-  Record<string, { severity: Severity; max: number }>
-> = {
+const EXPECTED_DEEP_RULES: Record<Stage, Record<string, ExpectedRule>> = {
   greenfield: {
-    "quality-metrics/wmc": { severity: "error", max: 15 },
-    "quality-metrics/halstead-volume": { severity: "warn", max: 800 },
-    "quality-metrics/halstead-effort": { severity: "warn", max: 300 },
-    "quality-metrics/lcom": { severity: "warn", max: 0 },
-    "quality-metrics/cbo": { severity: "error", max: 8 },
-    "quality-metrics/dit": { severity: "warn", max: 4 },
+    "quality-metrics/wmc": { kind: "single-max", severity: "error", max: 15 },
+    "quality-metrics/halstead": {
+      kind: "halstead",
+      severity: "warn",
+      maxVolume: 800,
+      maxEffort: 300,
+    },
+    "quality-metrics/lcom": { kind: "lcom", severity: "warn", maxLcom: 0 },
+    "quality-metrics/cbo": { kind: "single-max", severity: "error", max: 8 },
+    "quality-metrics/dit": { kind: "single-max", severity: "warn", max: 4 },
   },
   "brownfield-moderate": {
-    "quality-metrics/wmc": { severity: "error", max: 20 },
-    "quality-metrics/halstead-volume": { severity: "warn", max: 1000 },
-    "quality-metrics/halstead-effort": { severity: "warn", max: 400 },
-    "quality-metrics/lcom": { severity: "warn", max: 2 },
-    "quality-metrics/cbo": { severity: "error", max: 10 },
-    "quality-metrics/dit": { severity: "warn", max: 5 },
+    "quality-metrics/wmc": { kind: "single-max", severity: "error", max: 20 },
+    "quality-metrics/halstead": {
+      kind: "halstead",
+      severity: "warn",
+      maxVolume: 1000,
+      maxEffort: 400,
+    },
+    "quality-metrics/lcom": { kind: "lcom", severity: "warn", maxLcom: 2 },
+    "quality-metrics/cbo": { kind: "single-max", severity: "error", max: 10 },
+    "quality-metrics/dit": { kind: "single-max", severity: "warn", max: 5 },
   },
   legacy: {
-    "quality-metrics/wmc": { severity: "warn", max: 40 },
-    "quality-metrics/halstead-volume": { severity: "warn", max: 2000 },
-    "quality-metrics/halstead-effort": { severity: "warn", max: 1000 },
-    "quality-metrics/lcom": { severity: "warn", max: 4 },
-    "quality-metrics/cbo": { severity: "warn", max: 20 },
-    "quality-metrics/dit": { severity: "warn", max: 6 },
+    "quality-metrics/wmc": { kind: "single-max", severity: "warn", max: 40 },
+    "quality-metrics/halstead": {
+      kind: "halstead",
+      severity: "warn",
+      maxVolume: 2000,
+      maxEffort: 1000,
+    },
+    "quality-metrics/lcom": { kind: "lcom", severity: "warn", maxLcom: 4 },
+    "quality-metrics/cbo": { kind: "single-max", severity: "warn", max: 20 },
+    "quality-metrics/dit": { kind: "single-max", severity: "warn", max: 6 },
   },
 };
 
@@ -147,25 +169,39 @@ describe("oxlint presets — deep tier carries SPEC §3 thresholds", () => {
     });
 
     const expected = EXPECTED_DEEP_RULES[stage];
-    for (const [ruleName, { severity, max }] of Object.entries(expected)) {
-      it(`${stage}.deep · ${ruleName} = [${severity}, { max: ${max} }]`, () => {
+    for (const [ruleName, spec] of Object.entries(expected)) {
+      it(`${stage}.deep · ${ruleName} matches expected spec`, () => {
         const preset = loadPreset(stage, "deep");
         const entry = preset.rules?.[ruleName];
         expect(Array.isArray(entry)).toBe(true);
         if (!Array.isArray(entry)) return;
         const [actualSeverity, options] = entry;
-        expect(actualSeverity).toBe(severity);
-        expect(options.max).toBe(max);
+        expect(actualSeverity).toBe(spec.severity);
+        if (spec.kind === "single-max") {
+          expect(options.max).toBe(spec.max);
+        } else if (spec.kind === "lcom") {
+          expect(options.maxLcom).toBe(spec.maxLcom);
+        } else {
+          expect(options.maxVolume).toBe(spec.maxVolume);
+          expect(options.maxEffort).toBe(spec.maxEffort);
+        }
       });
     }
 
-    it(`${stage}.deep declares exactly the 6 expected quality-metrics rules`, () => {
+    it(`${stage}.deep declares exactly the 5 expected quality-metrics rules`, () => {
       const preset = loadPreset(stage, "deep");
       const ruleNames = Object.keys(preset.rules ?? {})
         .filter((r) => r.startsWith("quality-metrics/"))
         .sort();
       const expectedNames = Object.keys(EXPECTED_DEEP_RULES[stage]).sort();
       expect(ruleNames).toEqual(expectedNames);
+    });
+
+    it(`${stage}.deep does not carry the legacy halstead-volume/halstead-effort rule names`, () => {
+      const preset = loadPreset(stage, "deep");
+      const rules = preset.rules ?? {};
+      expect(rules["quality-metrics/halstead-volume"]).toBeUndefined();
+      expect(rules["quality-metrics/halstead-effort"]).toBeUndefined();
     });
   }
 });

@@ -7,9 +7,8 @@
   "jsPlugins": ["quality-metrics"],
   "rules": {
     "quality-metrics/wmc": ["error", { "max": 15 }],
-    "quality-metrics/halstead-volume": ["warn", { "max": 800 }],
-    "quality-metrics/halstead-effort": ["warn", { "max": 300 }],
-    "quality-metrics/lcom": ["warn", { "max": 0 }],
+    "quality-metrics/halstead": ["warn", { "maxVolume": 800, "maxEffort": 300 }],
+    "quality-metrics/lcom": ["warn", { "maxLcom": 0 }],
     "quality-metrics/cbo": ["error", { "max": 8 }],
     "quality-metrics/dit": ["warn", { "max": 4 }]
   }
