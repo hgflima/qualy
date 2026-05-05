@@ -161,6 +161,37 @@ const defaultRun: RunFn = (binary, args, cwd) => {
   }
 };
 
+/**
+ * Detect a preset-level failure from oxlint's stderr.
+ *
+ * When `runFn` returns `ok=false` with empty stdout, the failure can be either
+ * (a) the binary is missing, or (b) the preset is unparseable / references
+ * unknown plugins / rules. The two require very different recovery paths
+ * (`/lint:setup` reinstalls oxlint vs. fixes the preset; `/lint:rollback`
+ * restores a snapshot). String-anchor inspection is brittle across oxlint
+ * versions but degrades safely: when no anchor matches we fall through to
+ * `oxlint_missing` (status quo).
+ *
+ * Returns the trimmed first non-empty stderr line when an anchor matches, or
+ * `null` to defer to the binary-missing branch.
+ */
+const PRESET_INVALID_ANCHORS = [
+  /Failed to parse oxlint configuration file/i,
+  /Unknown plugin/i,
+  /Cannot find module/i,
+  /Unknown rule/i,
+] as const;
+
+export function classifyPresetFailure(stderr: string): string | null {
+  if (typeof stderr !== "string" || stderr.length === 0) return null;
+  if (!PRESET_INVALID_ANCHORS.some((re) => re.test(stderr))) return null;
+  for (const line of stderr.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -688,6 +719,16 @@ export function audit(opts: AuditOptions, deps: AuditDeps = {}): AuditResult {
   const args = ["--config", tier.configFile, "--format", "json", "."];
   const run = runFn(oxlintBin, args, cwd);
   if (!run.ok && run.stdout.length === 0) {
+    const presetIssue = classifyPresetFailure(run.stderr);
+    if (presetIssue !== null) {
+      return {
+        ok: false,
+        error: "preset_invalid",
+        reason:
+          `${tier.configFile}: ${presetIssue} — ` +
+          `reinstale o preset com /lint:setup ou restaure backup com /lint:rollback`,
+      };
+    }
     return {
       ok: false,
       error: "oxlint_missing",
@@ -872,6 +913,8 @@ export function runAudit(argv: readonly string[]): ExitCode {
     output(result);
     if (result.error === "dirty_tree") return EXIT_CODES.DIRTY_TREE;
     if (result.error === "oxlint_missing") return EXIT_CODES.MISSING_DEPENDENCY;
+    // preset_invalid is recoverable (user can /lint:setup or /lint:rollback);
+    // distinct from oxlint_missing so the harness shows the right hint.
     return EXIT_CODES.RECOVERABLE_ERROR;
   }
 
