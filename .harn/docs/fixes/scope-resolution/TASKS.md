@@ -41,7 +41,7 @@
 
 ## Phase 4 — Release
 
-- [ ] **T14** — `CHANGELOG.md` entrada `[Unreleased]` / `[0.3.2]`
+- [x] **T14** — `CHANGELOG.md` entrada `[Unreleased]` / `[0.3.2]`
 - [ ] **T15** — Smoke manual (project + user scopes) + suite verde
 
 ### ✅ Checkpoint D

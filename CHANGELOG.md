@@ -13,6 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Preâmbulo bash dos 19 arquivos funcionais resolve o CLI nos 3 scopes
+  (`user`, `project`, `local`).** O fallback antigo
+  (`${CLAUDE_PLUGIN_ROOT:-$HOME/.claude}`) furava o default `qualy install
+  --scope project` (CLI mora em `${PWD}/.claude`, não em `$HOME/.claude`) e
+  quebrava silenciosamente ou com `MODULE_NOT_FOUND`. O preâmbulo passa a
+  fazer probe `$PWD/.claude` → `$HOME/.claude` e falha com `exit 5`
+  (`MISSING_DEP`) + mensagem clara em stderr quando o CLI não foi instalado
+  em nenhum dos dois. Migração em `skills/lint/SKILL.md`, 4 `agents/lint-*.md`
+  e 14 `commands/lint/**/*.md`, garantida byte-a-byte por
+  `cli/tests/unit/preamble-parity.test.ts` + cenários reais por
+  `cli/tests/e2e/preamble-resolution.test.ts`. Ver
+  [ADR 0013](./docs/adrs/0013-scope-resolution-probe.md).
+
 ---
 
 ## [0.3.1] — 2026-05-05
