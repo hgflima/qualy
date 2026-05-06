@@ -108,10 +108,16 @@ See [`.harn/docs/lint-ignore/SPEC.md`](.harn/docs/lint-ignore/SPEC.md) for the f
 Each slash command is a thin wrapper over a deterministic CLI. You can invoke it directly:
 
 ```bash
-QUALY_CLI="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude}/skills/lint/cli/src/index.ts"
+QUALY_CLI=""
+for cand in "$PWD/.claude" "$HOME/.claude"; do
+  [ -f "$cand/skills/lint/cli/src/index.ts" ] && QUALY_CLI="$cand/skills/lint/cli/src/index.ts" && break
+done
+[ -z "$QUALY_CLI" ] && { echo "qualy CLI not found in \$PWD/.claude or \$HOME/.claude. Run \`qualy install\` first." >&2; exit 5; }
 node --experimental-strip-types "$QUALY_CLI" --help
 node --experimental-strip-types "$QUALY_CLI" status --cwd "$PWD"
 ```
+
+The probe checks `$PWD/.claude` first (covers `--scope project` / `--scope local`), then falls back to `$HOME/.claude` (covers `--scope user`). See `docs/adrs/0013-scope-resolution-probe.md` for the rationale.
 
 Contract: one JSON document on stdout per invocation, NDJSON + human messages on stderr, semantic exit codes. The CLI never asks questions — every interaction is the harness's job.
 
