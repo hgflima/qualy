@@ -37,7 +37,7 @@ const CANONICAL_PROBE = [
   'for cand in "$PWD/.claude" "$HOME/.claude"; do',
   '  [ -f "$cand/skills/lint/cli/src/index.ts" ] && QUALY_CLI="$cand/skills/lint/cli/src/index.ts" && break',
   "done",
-  '[ -z "$QUALY_CLI" ] && { echo "qualy CLI not found in \\$PWD/.claude or \\$HOME/.claude. Run `qualy install` first." >&2; exit 5; }',
+  '[ -z "$QUALY_CLI" ] && { echo "qualy CLI not found in \\$PWD/.claude or \\$HOME/.claude. Run \\`qualy install\\` first." >&2; exit 5; }',
 ].join("\n");
 
 function escapeRegex(s: string): string {
@@ -83,7 +83,9 @@ const FUNCTIONAL_FILES = [
  *   T7 → the four "commands/lint/ignore/*.md"
  *   T8 → the four "commands/lint/rules/*.md"
  */
-const MIGRATED: ReadonlySet<string> = new Set<string>([]);
+const MIGRATED: ReadonlySet<string> = new Set<string>([
+  "skills/lint/SKILL.md",
+]);
 
 function readFunctional(relPath: string): string {
   return readFileSync(join(REPO_ROOT, relPath), "utf8");

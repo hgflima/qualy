@@ -120,12 +120,23 @@ describe("skills/lint/SKILL.md — required sections (SPEC §4 line 295)", () =>
   });
 });
 
-describe("skills/lint/SKILL.md — Resolução do CLI preamble (PLAN §190–198)", () => {
-  it("defines the QUALY_CLI env var with CLAUDE_PLUGIN_ROOT fallback to $HOME/.claude", () => {
-    // PLAN line 196: QUALY_CLI="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude}/skills/lint/cli/src/index.ts"
+describe("skills/lint/SKILL.md — Resolução do CLI preamble (ADR 0013)", () => {
+  it("uses the canonical $PWD → $HOME probe block (ADR 0013)", () => {
+    // ADR 0013 / SPEC §6: 5-line probe replaces the legacy CLAUDE_PLUGIN_ROOT one-liner.
     expect(TEXT).toMatch(
-      /QUALY_CLI="\$\{CLAUDE_PLUGIN_ROOT:-\$HOME\/\.claude\}\/skills\/lint\/cli\/src\/index\.ts"/,
+      /QUALY_CLI=""\nfor cand in "\$PWD\/\.claude" "\$HOME\/\.claude"; do\n {2}\[ -f "\$cand\/skills\/lint\/cli\/src\/index\.ts" \] && QUALY_CLI="\$cand\/skills\/lint\/cli\/src\/index\.ts" && break\ndone/,
     );
+  });
+
+  it("fails with exit 5 (MISSING_DEP) when the probe finds nothing", () => {
+    // ADR 0013: probe falls through to `exit 5` with stderr message pointing at `qualy install`.
+    expect(TEXT).toMatch(
+      /\[ -z "\$QUALY_CLI" \] && \{ echo "qualy CLI not found in \\\$PWD\/\.claude or \\\$HOME\/\.claude\. Run \\`qualy install\\` first\." >&2; exit 5; \}/,
+    );
+  });
+
+  it("does not reference the legacy CLAUDE_PLUGIN_ROOT env var (ADR 0013)", () => {
+    expect(TEXT).not.toMatch(/CLAUDE_PLUGIN_ROOT/);
   });
 
   it("invokes node with --experimental-strip-types (ADR 0007)", () => {

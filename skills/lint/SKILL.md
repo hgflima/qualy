@@ -33,11 +33,15 @@ A skill instala e gerencia oxlint + oxfmt + `quality-metrics` em projetos TS/TSX
 Todo subcomando do harness usa o mesmo preâmbulo (definido aqui uma vez, reutilizado em `commands/lint/*.md` e `agents/lint-*.md`):
 
 ```bash
-QUALY_CLI="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude}/skills/lint/cli/src/index.ts"
+QUALY_CLI=""
+for cand in "$PWD/.claude" "$HOME/.claude"; do
+  [ -f "$cand/skills/lint/cli/src/index.ts" ] && QUALY_CLI="$cand/skills/lint/cli/src/index.ts" && break
+done
+[ -z "$QUALY_CLI" ] && { echo "qualy CLI not found in \$PWD/.claude or \$HOME/.claude. Run \`qualy install\` first." >&2; exit 5; }
 node --experimental-strip-types "$QUALY_CLI" <subcommand> --cwd "$PWD" "$@"
 ```
 
-`CLAUDE_PLUGIN_ROOT` é exportado pelo Claude Code quando a skill é carregada como plugin; quando não está, cai para `$HOME/.claude/` (layout do `install.sh`). Em workspace de dev (presença de `SPEC.md` em `$PWD` ou ancestor), pode-se apontar para `$REPO/cli/src/index.ts`.
+O probe testa `$PWD/.claude` antes de `$HOME/.claude`, cobrindo os 3 scopes documentados por `qualy install` (ADR 0010): `project`/`local` (`${cwd}/.claude`, default) e `user` (`${HOME}/.claude`). Sem CLI em nenhum dos dois caminhos, sai com exit 5 (`MISSING_DEP`) e mensagem em stderr apontando `qualy install`. Justificativa e alternativas em `docs/adrs/0013-scope-resolution-probe.md`.
 
 Saída padrão do CLI:
 
