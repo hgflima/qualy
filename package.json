@@ -1,6 +1,6 @@
 {
   "name": "@hgflima/qualy",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": false,
   "type": "module",
   "description": "Deterministic CLI + thin Claude Code harness for the qualy/lint skill (oxlint + oxfmt + quality-metrics).",
