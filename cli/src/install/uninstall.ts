@@ -10,7 +10,10 @@
  *      `ENOENT` is mapped to `kept[]` with reason `"already-absent"` — the user
  *      may have deleted the file manually; the uninstaller still records the
  *      intent in the JSON output. Other errors (`EACCES`, `EISDIR`, …) bubble
- *      up as `internal`.
+ *      up as `internal`. Entries with `kind: "runtime-node-modules"` point at
+ *      a directory tree (`skills/lint/node_modules`) materialized by `npm
+ *      install`; those are removed recursively via `rmSync(..., { recursive:
+ *      true })` so the whole tree goes in a single manifest entry.
  *   4. `deleteManifest(scopeRoot)` (skip on dry-run).
  *   5. Best-effort `rmdir` on the **direct** parent directories of removed
  *      entries — only one level, no recursion. Any non-empty parent is left
@@ -28,7 +31,7 @@
  */
 import type { Writable } from "node:stream";
 
-import { rmdirSync, unlinkSync } from "node:fs";
+import { rmSync, rmdirSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { EXIT_CODES, type ExitCode } from "../lib/exit-codes.ts";
@@ -153,7 +156,11 @@ export async function uninstallHarness(
       continue;
     }
     try {
-      unlinkSync(abs);
+      if (entry.kind === "runtime-node-modules") {
+        rmSync(abs, { recursive: true });
+      } else {
+        unlinkSync(abs);
+      }
       removed.push(entry.path);
     } catch (err) {
       if (isENOENT(err)) {

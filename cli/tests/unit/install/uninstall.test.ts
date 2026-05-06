@@ -23,15 +23,17 @@ import {
 } from "../../../src/install/uninstall.ts";
 
 /**
- * Stub materialize: never spawns npm and never writes a real `node_modules/`
- * tree. The runtime-node-modules manifest entry it produces lands in the
- * uninstaller's `kept[]` as `already-absent`. Once T5 teaches the uninstaller
- * to `rm -rf` runtime entries, the kept[] expectations below will collapse
- * back to whatever the fake leaves on disk (today: nothing extra).
+ * Stub materialize: writes a real `skills/lint/node_modules/` tree (and a
+ * placeholder file inside) without spawning npm. Mirrors what the real
+ * materializer leaves on disk so the uninstaller's recursive removal of the
+ * `runtime-node-modules` entry is exercised end-to-end.
  */
 const fakeMaterialize: MaterializeRuntimeFn = async ({ target, dryRun }) => {
   const runtimePath = join(target, "skills", "lint");
   if (dryRun) return { ok: true, stubCreated: null, runtimePath };
+  const nm = join(runtimePath, "node_modules", "@hgflima", "qualy");
+  mkdirSync(nm, { recursive: true });
+  writeFileSync(join(nm, "package.json"), '{"name":"@hgflima/qualy"}\n');
   return { ok: true, stubCreated: null, runtimePath };
 };
 import { manifestPath, readManifest } from "../../../src/install/manifest.ts";
@@ -174,15 +176,10 @@ describe("uninstallHarness", () => {
     expect(result.target).toBe(target);
     expect(result.dry_run).toBe(false);
     expect(result.removed.length).toBeGreaterThan(0);
-    // The manifest now also tracks `skills/lint/node_modules` (kind
-    // `runtime-node-modules`) — fakeMaterialize never creates that directory,
-    // so the entry resolves to `already-absent` here. T5 will teach uninstall
-    // to `rm -rf` runtime entries; once that lands, the kept[] entry below
-    // disappears.
-    expect(result.kept.map((k) => k.path)).toEqual([
-      join("skills", "lint", "node_modules"),
-    ]);
-    expect(result.kept[0]?.reason).toBe("already-absent");
+    // The runtime-node-modules entry was recursively removed in-place, so the
+    // tree never leaks into kept[].
+    expect(result.kept).toEqual([]);
+    expect(result.removed).toContain(join("skills", "lint", "node_modules"));
 
     // Manifest is gone, payload files are gone, parent directory was
     // best-effort rmdir'd. The .claude directory itself may or may not
@@ -192,6 +189,9 @@ describe("uninstallHarness", () => {
     expect(existsSync(join(target, "skills", "lint", "SKILL.md"))).toBe(false);
     expect(existsSync(join(target, "commands", "lint.md"))).toBe(false);
     expect(existsSync(join(target, "agents", "lint-detector.md"))).toBe(false);
+    expect(existsSync(join(target, "skills", "lint", "node_modules"))).toBe(
+      false,
+    );
   });
 
   it("uninstall without a manifest returns manifest_missing (exit 1)", async () => {
@@ -305,20 +305,84 @@ describe("uninstallHarness", () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // Two `already-absent` entries: the manually-deleted lint.md plus the
-    // runtime-node-modules entry the fake materialize never wrote to disk
-    // (T5 will collapse the latter into a real recursive removal).
-    expect(result.kept.map((k) => k.path).toSorted()).toEqual(
-      [
-        join("commands", "lint.md"),
-        join("skills", "lint", "node_modules"),
-      ].toSorted(),
+    // Only the manually-deleted lint.md is `already-absent`; the runtime
+    // tree existed on disk and was removed recursively.
+    expect(result.kept.map((k) => k.path)).toEqual([
+      join("commands", "lint.md"),
+    ]);
+    expect(result.kept[0]?.reason).toBe("already-absent");
+    // SKILL.md, agents/lint-detector.md, and skills/lint/node_modules were
+    // removed.
+    expect(result.removed.length).toBe(3);
+  });
+
+  it("rm -rf runtime-node-modules tree even when populated by npm", async () => {
+    gitInit(workspace);
+    await installHarness({
+      scope: "project",
+      cwd: workspace,
+      dryRun: false,
+      yes: false,
+      source,
+      materialize: fakeMaterialize,
+    });
+    const target = join(workspace, ".claude");
+    const nmRoot = join(target, "skills", "lint", "node_modules");
+    // Sanity: the fake materialize wrote a populated node_modules tree.
+    expect(existsSync(join(nmRoot, "@hgflima", "qualy", "package.json"))).toBe(
+      true,
+    );
+    // Add nested files so a non-recursive `unlink` would fail.
+    mkdirSync(join(nmRoot, "deep", "nested"), { recursive: true });
+    writeFileSync(join(nmRoot, "deep", "nested", "a.js"), "module.exports={};");
+
+    const result = await uninstallHarness({
+      scope: "project",
+      cwd: workspace,
+      dryRun: false,
+      yes: false,
+      keepBackup: false,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.removed).toContain(join("skills", "lint", "node_modules"));
+    expect(existsSync(nmRoot)).toBe(false);
+  });
+
+  it("missing runtime-node-modules tree maps to kept[] as already-absent", async () => {
+    gitInit(workspace);
+    await installHarness({
+      scope: "project",
+      cwd: workspace,
+      dryRun: false,
+      yes: false,
+      source,
+      materialize: fakeMaterialize,
+    });
+    const target = join(workspace, ".claude");
+    // Manually wipe the runtime tree before uninstall to simulate the user
+    // having run `rm -rf` (or a bug having moved it). The uninstaller must
+    // treat that as `already-absent`, not as an internal error.
+    rmSync(join(target, "skills", "lint", "node_modules"), {
+      recursive: true,
+      force: true,
+    });
+
+    const result = await uninstallHarness({
+      scope: "project",
+      cwd: workspace,
+      dryRun: false,
+      yes: false,
+      keepBackup: false,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.kept.map((k) => k.path)).toContain(
+      join("skills", "lint", "node_modules"),
     );
     for (const k of result.kept) {
       expect(k.reason).toBe("already-absent");
     }
-    // The remaining two payload files were removed normally.
-    expect(result.removed.length).toBe(2);
   });
 
   it("scope_resolution error: --scope project without .git/", async () => {
