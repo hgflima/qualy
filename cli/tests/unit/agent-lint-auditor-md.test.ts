@@ -11,9 +11,10 @@
  * of going through a CLI write subcommand.
  *
  * SPEC §4 line 296 caps the file at 150 lines; SPEC §4 line 295 fixes the
- * section list; PLAN §Resolução do CLI fixes the `QUALY_CLI=` preamble
- * (defined once in SKILL.md and reused here); SPEC §4 line 303 caps the
- * structured summary at ≤30 lines.
+ * section list; PLAN §Resolução do CLI fixes the `QUALY_BIN=` preamble
+ * (defined once in SKILL.md and reused here; canonical block updated in
+ * v0.3.4 — see .harn/docs/cli-bin-resolution/SPEC.md §4); SPEC §4 line
+ * 303 caps the structured summary at ≤30 lines.
  *
  * These tests lock that surface: drift in frontmatter, allowed tools (the
  * ADR 0008 exception specifically authorizes `Edit` — siblings forbid it),
@@ -149,16 +150,23 @@ describe("agents/lint-auditor.md — required sections (SPEC §4 line 295)", () 
   });
 });
 
-describe("agents/lint-auditor.md — Resolução do CLI preamble (ADR 0013)", () => {
-  it("uses the canonical $PWD → $HOME probe block (ADR 0013)", () => {
-    expect(TEXT).toMatch(
-      /QUALY_CLI=""\nfor cand in "\$PWD\/\.claude" "\$HOME\/\.claude"; do\n {2}\[ -f "\$cand\/skills\/lint\/cli\/src\/index\.ts" \] && QUALY_CLI="\$cand\/skills\/lint\/cli\/src\/index\.ts" && break\ndone/,
+describe("agents/lint-auditor.md — Resolução do CLI preamble (cli-bin-resolution SPEC §4)", () => {
+  it("uses the canonical $QUALY_DEV_BIN → $PWD → $HOME probe block (cli-bin-resolution SPEC §4)", () => {
+    expect(TEXT).toContain('QUALY_BIN=""');
+    expect(TEXT).toContain(
+      '[ -n "$QUALY_DEV_BIN" ] && [ -f "$QUALY_DEV_BIN" ] && QUALY_BIN="$QUALY_DEV_BIN"',
+    );
+    expect(TEXT).toContain(
+      '"$PWD/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs"',
+    );
+    expect(TEXT).toContain(
+      '"$HOME/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs"',
     );
   });
 
   it("fails with exit 5 (MISSING_DEP) when the probe finds nothing", () => {
-    expect(TEXT).toMatch(
-      /\[ -z "\$QUALY_CLI" \] && \{ echo "qualy CLI not found in \\\$PWD\/\.claude or \\\$HOME\/\.claude\. Run \\`qualy install\\` first\." >&2; exit 5; \}/,
+    expect(TEXT).toContain(
+      '[ -z "$QUALY_BIN" ] && { echo "qualy not installed. Run \\`npx @hgflima/qualy install\\` first." >&2; exit 5; }',
     );
   });
 
@@ -166,8 +174,13 @@ describe("agents/lint-auditor.md — Resolução do CLI preamble (ADR 0013)", ()
     expect(TEXT).not.toMatch(/CLAUDE_PLUGIN_ROOT/);
   });
 
-  it("invokes node with --experimental-strip-types (ADR 0007)", () => {
-    expect(TEXT).toMatch(/node --experimental-strip-types "\$QUALY_CLI"/);
+  it("does not reference the legacy QUALY_CLI variable (cli-bin-resolution v0.3.4)", () => {
+    expect(TEXT).not.toMatch(/QUALY_CLI/);
+    expect(TEXT).not.toMatch(/cli\/src\/index\.ts/);
+  });
+
+  it("invokes the materialized bin via `node \"$QUALY_BIN\"` (cli-bin-resolution SPEC §4)", () => {
+    expect(TEXT).toContain('node "$QUALY_BIN"');
   });
 
   it("links back to SKILL.md as the canonical preamble source", () => {

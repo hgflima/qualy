@@ -12,9 +12,8 @@
  * which entry point they hit.
  *
  * Migration is staged across two tasks (T7a, T7b): SKILL.md + the 14
- * commands flip first, then the 4 agents. While T7a is in flight the
- * `MIGRATED` set excludes the agents so backpressure stays green; once
- * T7b lands the set covers all 19 files and the suite exercises every
+ * commands flipped first, then the 4 agents. With T7b landed the
+ * `MIGRATED` set covers all 19 files and the suite exercises every
  * probe.
  */
 import { globSync, readFileSync } from "node:fs";
@@ -83,10 +82,14 @@ const FUNCTIONAL_FILES = [
 
 /**
  * Paths whose preamble has been migrated to the canonical block.
- * T7a flips SKILL.md + the 14 commands; T7b adds the four agents.
+ * T7a flipped SKILL.md + the 14 commands; T7b added the four agents.
  */
 const MIGRATED: ReadonlySet<string> = new Set<string>([
   "skills/lint/SKILL.md",
+  "agents/lint-auditor.md",
+  "agents/lint-detector.md",
+  "agents/lint-installer.md",
+  "agents/lint-migrator.md",
   "commands/lint/audit.md",
   "commands/lint/report.md",
   "commands/lint/rollback.md",
@@ -139,12 +142,14 @@ describe("preamble parity — canonical probe block", () => {
       ["skills/**/*.md", "agents/**/*.md", "commands/**/*.md"],
       { cwd: REPO_ROOT },
     );
-    // Match either the legacy `QUALY_CLI=` (pre-T7b agents) or the new
-    // `QUALY_BIN=` initializer; both are guaranteed to appear exactly
-    // once per functional file (in the probe block) until T7b lands.
+    // With T7b landed every functional file must initialise `QUALY_BIN=""`
+    // exactly once (in the probe block). Any new functional `.md` either
+    // adopts the canonical block (and shows up here) or is intentionally
+    // legacy-free; this guard fires the moment a new file slips in
+    // without the canonical preamble.
     const found = candidates
       .map((p) => p.split(sep).join("/"))
-      .filter((p) => /QUALY_(CLI|BIN)=""/.test(readFunctional(p)));
+      .filter((p) => /QUALY_BIN=""/.test(readFunctional(p)));
     expect(found.sort()).toEqual([...FUNCTIONAL_FILES].sort());
   });
 });

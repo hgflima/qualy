@@ -32,12 +32,18 @@ Responsabilidade única: detectar. Nunca instalar, nunca migrar (SPEC §4 line 3
 Use o preâmbulo de `skills/lint/SKILL.md` (Resolução do CLI) em cada Bash:
 
 ```bash
-QUALY_CLI=""
-for cand in "$PWD/.claude" "$HOME/.claude"; do
-  [ -f "$cand/skills/lint/cli/src/index.ts" ] && QUALY_CLI="$cand/skills/lint/cli/src/index.ts" && break
-done
-[ -z "$QUALY_CLI" ] && { echo "qualy CLI not found in \$PWD/.claude or \$HOME/.claude. Run \`qualy install\` first." >&2; exit 5; }
-node --experimental-strip-types "$QUALY_CLI" <subcommand> --cwd "$PWD" "$@"
+QUALY_BIN=""
+# Dev override (uso interno do repo qualy): aponta para bin/qualy.mjs local.
+[ -n "$QUALY_DEV_BIN" ] && [ -f "$QUALY_DEV_BIN" ] && QUALY_BIN="$QUALY_DEV_BIN"
+# Lookup padrão: cópia materializada por `qualy install`.
+if [ -z "$QUALY_BIN" ]; then
+  for cand in "$PWD/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs" \
+              "$HOME/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs"; do
+    [ -f "$cand" ] && QUALY_BIN="$cand" && break
+  done
+fi
+[ -z "$QUALY_BIN" ] && { echo "qualy not installed. Run \`npx @hgflima/qualy install\` first." >&2; exit 5; }
+node "$QUALY_BIN" <subcommand> --cwd "$PWD" "$@"
 ```
 
 1. **`detect-stack`** — exit `2` (`unsupported_stack`): pare aqui, emita `stack: unsupported (<blockers>)` e encerre. Sumário ainda ≤ 30 linhas.
@@ -85,6 +91,6 @@ recommendation: <linha única — o que /lint:setup deve fazer a seguir>
 
 - `.harn/docs/mvp/SPEC.md` §1 (stacks suportadas), §3 (heurística de estágio), §4 (subagents), §6 Always (sinais brutos).
 - `.harn/docs/mvp/PLAN.md` §Fase 1 + §Resolução do CLI.
-- `skills/lint/SKILL.md` — preâmbulo `QUALY_CLI` e mapeamento de exit codes.
+- `skills/lint/SKILL.md` — preâmbulo `QUALY_BIN` e mapeamento de exit codes.
 - `commands/lint/setup.md` — chamador principal deste subagent.
 - `docs/adrs/0006-deterministic-cli-thin-harness.md` — princípio (CLI faz, harness coordena).

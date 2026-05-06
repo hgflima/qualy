@@ -33,12 +33,18 @@ Responsabilidade única: enriquecer prosa. Nunca recalcula `proposed_value`, `id
 Use o preâmbulo de `skills/lint/SKILL.md` (Resolução do CLI):
 
 ```bash
-QUALY_CLI=""
-for cand in "$PWD/.claude" "$HOME/.claude"; do
-  [ -f "$cand/skills/lint/cli/src/index.ts" ] && QUALY_CLI="$cand/skills/lint/cli/src/index.ts" && break
-done
-[ -z "$QUALY_CLI" ] && { echo "qualy CLI not found in \$PWD/.claude or \$HOME/.claude. Run \`qualy install\` first." >&2; exit 5; }
-node --experimental-strip-types "$QUALY_CLI" <subcommand> --cwd "$PWD" "$@"
+QUALY_BIN=""
+# Dev override (uso interno do repo qualy): aponta para bin/qualy.mjs local.
+[ -n "$QUALY_DEV_BIN" ] && [ -f "$QUALY_DEV_BIN" ] && QUALY_BIN="$QUALY_DEV_BIN"
+# Lookup padrão: cópia materializada por `qualy install`.
+if [ -z "$QUALY_BIN" ]; then
+  for cand in "$PWD/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs" \
+              "$HOME/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs"; do
+    [ -f "$cand" ] && QUALY_BIN="$cand" && break
+  done
+fi
+[ -z "$QUALY_BIN" ] && { echo "qualy not installed. Run \`npx @hgflima/qualy install\` first." >&2; exit 5; }
+node "$QUALY_BIN" <subcommand> --cwd "$PWD" "$@"
 ```
 
 Parâmetros recebidos do parent (via prompt do subagent):
@@ -92,7 +98,7 @@ recommendation: <linha única — /lint:update se enriched > 0, /lint:report, ou
 
 - `.harn/docs/mvp/SPEC.md` §2 (`/lint:audit` orquestrador), §3 (audit contract — `recommendations[]` shape), §4 line 302 (responsabilidade única), §6 (audit↔update), §7.5/§7.6 (acceptance).
 - `.harn/docs/mvp/PLAN.md` §Fase 4 + §Resolução do CLI.
-- `skills/lint/SKILL.md` — preâmbulo `QUALY_CLI` e mapeamento de exit codes.
+- `skills/lint/SKILL.md` — preâmbulo `QUALY_BIN` e mapeamento de exit codes.
 - `commands/lint/audit.md` — único chamador deste subagent.
 - `agents/lint-detector.md` / `agents/lint-installer.md` / `agents/lint-migrator.md` — siblings; este subagent NÃO os invoca.
 - `docs/recs-heuristics.md` — `rationale_stub` templates (§5) e cap de 5 arquivos (`evidence.top[]` §3).

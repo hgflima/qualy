@@ -32,12 +32,18 @@ Em vez de o orquestrador (`/lint:setup`, `/lint:rollback`, `/lint:uninstall`) ch
 Use o preâmbulo de `skills/lint/SKILL.md` (Resolução do CLI) em cada Bash:
 
 ```bash
-QUALY_CLI=""
-for cand in "$PWD/.claude" "$HOME/.claude"; do
-  [ -f "$cand/skills/lint/cli/src/index.ts" ] && QUALY_CLI="$cand/skills/lint/cli/src/index.ts" && break
-done
-[ -z "$QUALY_CLI" ] && { echo "qualy CLI not found in \$PWD/.claude or \$HOME/.claude. Run \`qualy install\` first." >&2; exit 5; }
-node --experimental-strip-types "$QUALY_CLI" <subcommand> --cwd "$PWD" "$@"
+QUALY_BIN=""
+# Dev override (uso interno do repo qualy): aponta para bin/qualy.mjs local.
+[ -n "$QUALY_DEV_BIN" ] && [ -f "$QUALY_DEV_BIN" ] && QUALY_BIN="$QUALY_DEV_BIN"
+# Lookup padrão: cópia materializada por `qualy install`.
+if [ -z "$QUALY_BIN" ]; then
+  for cand in "$PWD/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs" \
+              "$HOME/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs"; do
+    [ -f "$cand" ] && QUALY_BIN="$cand" && break
+  done
+fi
+[ -z "$QUALY_BIN" ] && { echo "qualy not installed. Run \`npx @hgflima/qualy install\` first." >&2; exit 5; }
+node "$QUALY_BIN" <subcommand> --cwd "$PWD" "$@"
 ```
 
 Parâmetros recebidos do parent (via prompt do subagent):
@@ -96,7 +102,7 @@ recommendation: <linha única — qualy status, /lint:rollback, /lint:setup, ou 
 
 - `.harn/docs/mvp/SPEC.md` §2 (slash commands), §4 line 302 (responsabilidade única), §6 Always (backup nomeado), §7.2 (acceptance brownfield → setup → rollback byte-a-byte).
 - `.harn/docs/mvp/PLAN.md` §Fase 3 + §Resolução do CLI.
-- `skills/lint/SKILL.md` — preâmbulo `QUALY_CLI` e mapeamento de exit codes.
+- `skills/lint/SKILL.md` — preâmbulo `QUALY_BIN` e mapeamento de exit codes.
 - `commands/lint/setup.md` — chamador no modo `migrate` (após `lint-detector` reportar linter prévio).
 - `commands/lint/rollback.md` — chamador no modo `restore`.
 - `commands/lint/uninstall.md` — chamador no modo `uninstall`.
