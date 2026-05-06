@@ -15,6 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.3] — 2026-05-06
+
+### Fixed
+
+- **`qualy update` aplicava `npx qualy@<v> install` (nome não-escopado) e
+  falhava com `404 Not Found` no registry npm.** O codepath de aplicação em
+  `cli/src/install/update.ts` (`defaultApplyInstall`) agora invoca
+  `npx @hgflima/qualy@<v> install …`, alinhado com `registry.ts` que já usava
+  o nome correto em `npm view`. A mensagem de erro `apply_failed` também
+  reflete o pacote escopado. Sem isso, `qualy update` ficava bloqueado para
+  qualquer release ≥ 0.3.2.
+
+---
+
 ## [0.3.2] — 2026-05-06
 
 ### Fixed

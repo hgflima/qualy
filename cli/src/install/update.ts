@@ -13,7 +13,7 @@
  *        - equal or installed-greater → `up-to-date`, exit `0`.
  *        - latest > installed         → log `installed → latest`. On a major
  *          bump without `--yes` (and not `--dry-run`) prompt y/N via readline.
- *        - apply via `npx qualy@<latest> install --scope <X> --cwd <Y> --yes`
+ *        - apply via `npx @hgflima/qualy@<latest> install --scope <X> --cwd <Y> --yes`
  *          unless `--dry-run` (which returns `would-update`).
  *
  * Output (single canonical JSON to stdout, SPEC §6):
@@ -72,7 +72,7 @@ export type UpdateOptions = {
   readonly yes: boolean;
   /** Test seam — defaults to `registry.ts#fetchLatestVersion`. */
   readonly fetchLatestVersion?: typeof defaultFetch;
-  /** Test seam — defaults to `npx qualy@<v> install --scope <X> --yes`. */
+  /** Test seam — defaults to `npx @hgflima/qualy@<v> install --scope <X> --yes`. */
   readonly applyInstall?: ApplyInstall;
   /** Test seam — defaults to a `readline`-based y/N prompt on stderr. */
   readonly prompt?: PromptFn;
@@ -316,10 +316,11 @@ const defaultApplyInstall: ApplyInstall = (args) =>
       resolved = true;
       resolve(r);
     };
+    const pkgSpec = `@hgflima/qualy@${args.version}`;
     const child = spawn(
       NPX_BIN,
       [
-        `qualy@${args.version}`,
+        pkgSpec,
         "install",
         "--scope",
         args.scope,
@@ -337,7 +338,7 @@ const defaultApplyInstall: ApplyInstall = (args) =>
       else
         finish({
           ok: false,
-          reason: `\`npx qualy@${args.version} install\` exited with code ${String(code)}`,
+          reason: `\`npx ${pkgSpec} install\` exited with code ${String(code)}`,
         });
     });
   });
