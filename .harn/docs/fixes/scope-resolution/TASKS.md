@@ -6,13 +6,13 @@
 
 - [x] **T1** — Criar `docs/adrs/0013-scope-resolution-probe.md` com bloco canônico
 - [x] **T2** — Criar `cli/tests/unit/preamble-parity.test.ts` (esperado: vermelho ainda)
-- [ ] **T3** — Criar `cli/tests/e2e/preamble-resolution.test.ts` (esperado: verde)
+- [x] **T3** — Criar `cli/tests/e2e/preamble-resolution.test.ts` (esperado: verde)
 
 ### ✅ Checkpoint A
-- [ ] ADR 0013 mergeable
-- [ ] E2E verde
+- [x] ADR 0013 mergeable
+- [x] E2E verde
 - [ ] Unit vermelho controlado (regex-mismatch nos 19)
-- [ ] `npm run typecheck` verde
+- [x] `npm run typecheck` verde
 
 ## Phase 2 — Migrar 19 arquivos funcionais
 
