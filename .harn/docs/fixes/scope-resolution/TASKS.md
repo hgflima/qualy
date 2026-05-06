@@ -36,13 +36,13 @@
 - [x] **T13** — `.harn/docs/mvp/PLAN.md` + `IMPLEMENTATION_PLAN.md`
 
 ### ✅ Checkpoint C
-- [ ] `grep -rln 'CLAUDE_PLUGIN_ROOT' --include="*.md" .` → 0 (exceto referências históricas explícitas em ADR 0013)
+- [x] `grep -rln 'CLAUDE_PLUGIN_ROOT' --include="*.md" .` → 0 (exceto referências históricas explícitas em ADR 0013)
 - [x] Cross-links 0006→0013 e 0007→0013 visíveis
 
 ## Phase 4 — Release
 
 - [x] **T14** — `CHANGELOG.md` entrada `[Unreleased]` / `[0.3.2]`
-- [ ] **T15** — Smoke manual (project + user scopes) + suite verde
+- [x] **T15** — Smoke manual (project + user scopes) + suite verde
 
 ### ✅ Checkpoint D
 - [ ] Todos os 12 critérios da SPEC §9 marcados
