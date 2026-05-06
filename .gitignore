@@ -10,3 +10,4 @@ dist/
 .lint-manifest.json
 .ralph_stuck_tracker
 ralph.log
+.harn/ralphy
