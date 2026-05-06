@@ -11,10 +11,10 @@ ADR 0006 fixou que o produto tem duas camadas físicas:
 1. Harness Markdown — `skills/lint/`, `commands/lint/`, `agents/lint-*.md`.
 2. CLI determinístico — `cli/src/` (TypeScript executado por `node --experimental-strip-types`, ADR 0007).
 
-Para que o Claude Code descubra a skill, esses artefatos precisam estar resolvíveis a partir de `${CLAUDE_PLUGIN_ROOT:-$HOME/.claude}` no layout fixado em `PLAN §Resolução do CLI`:
+Para que o Claude Code descubra a skill, esses artefatos precisam estar resolvíveis pelo probe `$PWD/.claude → $HOME/.claude` (ver ADR 0013 para o bloco canônico) no layout fixado em `PLAN §Resolução do CLI`:
 
 ```
-$CLAUDE_PLUGIN_ROOT/
+$TARGET_ROOT/                              (= $PWD/.claude ou $HOME/.claude)
 ├── skills/lint/SKILL.md
 ├── skills/lint/cli/src/index.ts          (← chamado pelo harness)
 ├── commands/lint/{setup,audit,update,…}.md
@@ -45,11 +45,11 @@ Implicações concretas:
    - `copy` é o caminho seguro para usuários finais: snapshot do estado atual, edits no fonte não vazam para a instalação.
    - `--dev` (symlink) é para quem desenvolve em `qualy/`: edits em `cli/src/` ficam imediatamente visíveis ao Claude Code sem reinstalar. Acoplado ao zero-build-step do ADR 0007 — junto, formam o ciclo "editar `.ts` → executar".
 3. **Validação de Node antes de qualquer escrita.** `require_node` aborta com exit 1 e mensagem acionável se `node --version` < 22.6 (ou se Node não existir no PATH). Coerente com ADR 0007 — instalar artefatos que não vão executar geraria erro confuso depois.
-4. **Layout específico do CLI.** `cli/` é instalado em `<target>/skills/lint/cli/`, não em `<target>/cli/`. Isso satisfaz o pattern de resolução fixado em `PLAN §Resolução do CLI` (`$CLAUDE_PLUGIN_ROOT/skills/lint/cli/src/index.ts`) sem que o harness precise inventar paths.
+4. **Layout específico do CLI.** `cli/` é instalado em `<target>/skills/lint/cli/`, não em `<target>/cli/`. Isso satisfaz o pattern de resolução fixado em `PLAN §Resolução do CLI` (`<target>/skills/lint/cli/src/index.ts`, onde `<target>` é resolvido pelo probe `$PWD/.claude → $HOME/.claude` — ver ADR 0013) sem que o harness precise inventar paths.
 5. **Idempotência explícita.** Re-rodar `install.sh` substitui artefatos no lugar (`rm -rf` do destino + cópia/symlink novo). Não há merge — cada `install.sh` produz o estado exato do fonte naquele momento. Em modo symlink, se o link já aponta para o source correto, é noop logado.
 6. **Guarda defensiva contra remoção fora do alvo.** Função `assert_safe_target` recusa qualquer caminho que (i) seja vazio, (ii) seja `/`, `$HOME`, `$HOME/`, `$TARGET_ROOT`, `$TARGET_ROOT/`, ou (iii) não esteja sob `$TARGET_ROOT/`. Aplicada antes de todo `rm -rf`. É a barreira que torna seguro o uso de `rm -rf` em paths derivados.
 7. **`--dry-run` obrigatório.** Modo que loga todas as operações (`copy x → y`, `symlink x -> y`) sem tocar o FS. Disponível desde a v1 — auditável antes de confiar.
-8. **`--target <path>`.** Default `$HOME/.claude`, mas sobrescrevível. Necessário para testes (instalar num `mktemp -d`) e para usuários com `$CLAUDE_PLUGIN_ROOT` customizado.
+8. **`--target <path>`.** Default `$HOME/.claude`, mas sobrescrevível. Necessário para testes (instalar num `mktemp -d`) e para usuários com layout customizado (e.g., scope `project` em `$PWD/.claude`, conforme probe do ADR 0013).
 9. **Sem desinstalador no script.** `install.sh` não desinstala a si mesmo. A skill expõe `/lint:uninstall` para remover artefatos *que ela mesma criou no projeto-alvo* (via `.lint-manifest.json`); remover a instalação em `~/.claude/` é responsabilidade do usuário (`rm -rf ~/.claude/skills/lint ~/.claude/commands/lint ~/.claude/agents/lint-*`). Documentado no README.
 
 ## Consequências
