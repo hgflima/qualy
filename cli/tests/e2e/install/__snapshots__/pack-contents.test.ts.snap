@@ -50,6 +50,7 @@ exports[`e2e: npm pack contents > snapshot of the full sorted file list 1`] = `
   "cli/src/install/gitignore.ts",
   "cli/src/install/install.ts",
   "cli/src/install/manifest.ts",
+  "cli/src/install/materialize-runtime.ts",
   "cli/src/install/registry.ts",
   "cli/src/install/scope.ts",
   "cli/src/install/uninstall.ts",

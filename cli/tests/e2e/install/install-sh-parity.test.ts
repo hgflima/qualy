@@ -6,12 +6,24 @@
  * Both invocations target a synthetic HOME under os.tmpdir() so the real
  * `~/.claude` is never touched. The comparison filters paths that are
  * divergent by design:
- *   - install.sh --dev symlinks entire directories (cli/ in particular),
- *     so a symlink-following walk reaches dev-only artifacts (tests/,
- *     node_modules/, coverage/, dist/) that `qualy install` excludes via
- *     walkPayload(). The exclusion list captures exactly that delta.
+ *   - install.sh --dev symlinks entire directories so a symlink-following
+ *     walk reaches dev-only artifacts (tests/, node_modules/, coverage/,
+ *     dist/) that `qualy install` excludes via walkPayload(). The
+ *     SKIP_DIR_NAMES set captures exactly that delta.
  *   - `.lint-manifest.json` is written only by qualy install — install.sh
  *     predates the manifest contract.
+ *   - Post-v0.3.4 (cli-bin-resolution): the two paths diverge in how they
+ *     surface the qualy CLI runtime under `skills/lint/`. install.sh --dev
+ *     symlinks the repo's `cli/` source tree there (so maintainers iterate
+ *     against live sources), while `qualy install` no longer copies `cli/`
+ *     at all (T2) and instead materializes `node_modules/@hgflima/qualy/`
+ *     plus a stub `package.json` via `npm install` (T3+T4). Both runtimes
+ *     are functionally equivalent at the slash-command preamble level
+ *     (which resolves QUALY_BIN — see SKILL.md preamble), but the on-disk
+ *     layout under `skills/lint/` is intentionally asymmetric. The
+ *     `EXCLUDE_PATH_PREFIXES` and `EXCLUDE_FILES` sets below carve out
+ *     that asymmetric region so the parity assertion still meaningfully
+ *     covers the shared product surface (SKILL.md, commands/, agents/).
  *
  * The two smaller tests around the deprecation note guard the soft-deprecation
  * itself (TASKS 4.2 — "deprecation soft, não bloqueante"): default `install.sh`
@@ -44,7 +56,29 @@ const SKIP_DIR_NAMES = new Set([
   ".harn",
 ]);
 
-const EXCLUDE_FILES = new Set<string>([".lint-manifest.json"]);
+const EXCLUDE_FILES = new Set<string>([
+  ".lint-manifest.json",
+  // Stub written by `materializeRuntime` only on the npx path (T4) — install.sh
+  // doesn't run the runtime materializer, so there's no counterpart on the
+  // --dev side. Excluded so the parity assertion stays meaningful.
+  join("skills", "lint", "package.json"),
+]);
+
+/**
+ * Path prefixes (relative to root) whose entire subtree is excluded from
+ * the parity diff. Currently scopes out `skills/lint/cli/`: install.sh --dev
+ * symlinks the repo's `cli/` source tree there, while `qualy install` no
+ * longer ships `cli/` (T2) and instead materializes a published runtime
+ * under `skills/lint/node_modules/@hgflima/qualy/` (already filtered by
+ * SKIP_DIR_NAMES via `node_modules`).
+ */
+const EXCLUDE_PATH_PREFIXES = [join("skills", "lint", "cli")];
+
+function isUnderExcludedPrefix(rel: string): boolean {
+  return EXCLUDE_PATH_PREFIXES.some(
+    (prefix) => rel === prefix || rel.startsWith(`${prefix}/`),
+  );
+}
 
 /**
  * Recursive walker that follows symlinks (statSync, not lstatSync) and
@@ -65,6 +99,7 @@ function walkFollowingSymlinks(root: string): Set<string> {
     for (const ent of entries) {
       if (SKIP_DIR_NAMES.has(ent.name)) continue;
       const childRel = rel === "" ? ent.name : join(rel, ent.name);
+      if (isUnderExcludedPrefix(childRel)) continue;
       const childAbs = join(root, childRel);
       let st;
       try {
