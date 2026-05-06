@@ -33,7 +33,11 @@ Responsabilidade única: enriquecer prosa. Nunca recalcula `proposed_value`, `id
 Use o preâmbulo de `skills/lint/SKILL.md` (Resolução do CLI):
 
 ```bash
-QUALY_CLI="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude}/skills/lint/cli/src/index.ts"
+QUALY_CLI=""
+for cand in "$PWD/.claude" "$HOME/.claude"; do
+  [ -f "$cand/skills/lint/cli/src/index.ts" ] && QUALY_CLI="$cand/skills/lint/cli/src/index.ts" && break
+done
+[ -z "$QUALY_CLI" ] && { echo "qualy CLI not found in \$PWD/.claude or \$HOME/.claude. Run \`qualy install\` first." >&2; exit 5; }
 node --experimental-strip-types "$QUALY_CLI" <subcommand> --cwd "$PWD" "$@"
 ```
 

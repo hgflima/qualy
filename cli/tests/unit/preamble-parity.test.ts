@@ -85,6 +85,10 @@ const FUNCTIONAL_FILES = [
  */
 const MIGRATED: ReadonlySet<string> = new Set<string>([
   "skills/lint/SKILL.md",
+  "agents/lint-auditor.md",
+  "agents/lint-detector.md",
+  "agents/lint-installer.md",
+  "agents/lint-migrator.md",
 ]);
 
 function readFunctional(relPath: string): string {
