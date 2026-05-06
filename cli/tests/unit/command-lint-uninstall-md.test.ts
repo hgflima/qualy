@@ -125,11 +125,21 @@ describe("commands/lint/uninstall.md — required sections (SPEC §4 line 295)",
   });
 });
 
-describe("commands/lint/uninstall.md — Resolução do CLI preamble (PLAN §190–198)", () => {
-  it("references the QUALY_CLI env var with CLAUDE_PLUGIN_ROOT fallback", () => {
+describe("commands/lint/uninstall.md — Resolução do CLI preamble (ADR 0013)", () => {
+  it("uses the canonical $PWD → $HOME probe block (ADR 0013)", () => {
     expect(TEXT).toMatch(
-      /QUALY_CLI="\$\{CLAUDE_PLUGIN_ROOT:-\$HOME\/\.claude\}\/skills\/lint\/cli\/src\/index\.ts"/,
+      /QUALY_CLI=""\nfor cand in "\$PWD\/\.claude" "\$HOME\/\.claude"; do\n {2}\[ -f "\$cand\/skills\/lint\/cli\/src\/index\.ts" \] && QUALY_CLI="\$cand\/skills\/lint\/cli\/src\/index\.ts" && break\ndone/,
     );
+  });
+
+  it("fails with exit 5 (MISSING_DEP) when the probe finds nothing", () => {
+    expect(TEXT).toMatch(
+      /\[ -z "\$QUALY_CLI" \] && \{ echo "qualy CLI not found in \\\$PWD\/\.claude or \\\$HOME\/\.claude\. Run \\`qualy install\\` first\." >&2; exit 5; \}/,
+    );
+  });
+
+  it("does not reference the legacy CLAUDE_PLUGIN_ROOT env var (ADR 0013)", () => {
+    expect(TEXT).not.toMatch(/CLAUDE_PLUGIN_ROOT/);
   });
 
   it("invokes node with --experimental-strip-types (ADR 0007)", () => {
