@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -32,10 +32,11 @@ function makeSource(root: string): void {
     "agent body\n",
   );
 
+  // Below this line: a `cli/` tree is intentionally placed in the source to
+  // verify that walkPayload no longer descends into it (v0.3.4 ships the CLI
+  // via `npm install` into `skills/lint/node_modules/`, not via copy).
   mkdirSync(join(root, "cli", "src"), { recursive: true });
   writeFileSync(join(root, "cli", "src", "index.ts"), "export {};\n");
-
-  // Below this line: payload that walkPayload must skip.
   mkdirSync(join(root, "cli", "tests"), { recursive: true });
   writeFileSync(
     join(root, "cli", "tests", "should-skip.test.ts"),
@@ -60,30 +61,34 @@ describe("walkPayload", () => {
     rmSync(source, { recursive: true, force: true });
   });
 
-  it("yields every file under skills/commands/agents/cli", () => {
+  it("yields every file under skills/commands/agents", () => {
     const rels = [...walkPayload(source)].toSorted();
     expect(rels).toEqual([
       join("agents", "lint-detector.md"),
-      join("cli", "src", "index.ts"),
       join("commands", "lint", "audit.md"),
       join("skills", "lint", "SKILL.md"),
     ]);
   });
 
-  it("skips cli/tests and cli/node_modules entirely", () => {
+  it("does not descend into cli/ at all (no longer part of payload)", () => {
     const rels = [...walkPayload(source)];
-    expect(rels.some((r) => r.startsWith(join("cli", "tests")))).toBe(false);
-    expect(rels.some((r) => r.startsWith(join("cli", "node_modules")))).toBe(
-      false,
-    );
+    expect(rels.some((r) => r.startsWith(`cli${sep}`))).toBe(false);
   });
 
-  it("does not follow symlinks (mirrors dev tree's skills/lint/cli → cli/)", () => {
-    symlinkSync(join(source, "cli"), join(source, "skills", "lint", "cli"), "dir");
+  it("does not follow symlinks under skills/", () => {
+    // A symlink under a walked top-level directory must not be followed —
+    // the walker yields only regular files (matters for any future symlinks
+    // a user or build step might leave behind).
+    mkdirSync(join(source, "external"), { recursive: true });
+    writeFileSync(join(source, "external", "shadow.md"), "shadow body\n");
+    symlinkSync(
+      join(source, "external"),
+      join(source, "skills", "lint", "linked"),
+      "dir",
+    );
     const rels = [...walkPayload(source)];
-    // The symlinked subtree must not appear; SKILL.md still does.
     expect(
-      rels.some((r) => r.startsWith(join("skills", "lint", "cli"))),
+      rels.some((r) => r.startsWith(join("skills", "lint", "linked"))),
     ).toBe(false);
     expect(rels).toContain(join("skills", "lint", "SKILL.md"));
   });
@@ -99,12 +104,6 @@ describe("walkPayload", () => {
 });
 
 describe("mapTarget", () => {
-  it("rewrites cli/* under skills/lint/ inside the target", () => {
-    expect(mapTarget(join("cli", "src", "x.ts"), "/T")).toBe(
-      join("/T", "skills", "lint", "cli", "src", "x.ts"),
-    );
-  });
-
   it("preserves skills|commands|agents under the target unchanged", () => {
     expect(mapTarget(join("skills", "lint", "SKILL.md"), "/T")).toBe(
       join("/T", "skills", "lint", "SKILL.md"),
@@ -153,7 +152,7 @@ describe("copyPayload", () => {
     const result = await copyPayload({ source, target, dryRun: false });
 
     expect(result.skipped).toEqual([]);
-    expect(result.copied).toHaveLength(4);
+    expect(result.copied).toHaveLength(3);
 
     expect(
       readFileSync(join(target, "skills", "lint", "SKILL.md"), "utf8"),
@@ -164,12 +163,11 @@ describe("copyPayload", () => {
     expect(
       readFileSync(join(target, "agents", "lint-detector.md"), "utf8"),
     ).toBe("agent body\n");
+    // cli/src/index.ts must NOT be copied — that subtree is materialized via
+    // npm install in materialize-runtime.ts, not via the copy pipeline.
     expect(
-      readFileSync(
-        join(target, "skills", "lint", "cli", "src", "index.ts"),
-        "utf8",
-      ),
-    ).toBe("export {};\n");
+      existsSync(join(target, "skills", "lint", "cli", "src", "index.ts")),
+    ).toBe(false);
 
     for (const entry of result.copied) {
       expect(entry.sha256).toMatch(/^[0-9a-f]{64}$/);
@@ -181,13 +179,13 @@ describe("copyPayload", () => {
     await copyPayload({ source, target, dryRun: false });
     const second = await copyPayload({ source, target, dryRun: false });
     expect(second.copied).toEqual([]);
-    expect(second.skipped).toHaveLength(4);
+    expect(second.skipped).toHaveLength(3);
   });
 
   it("(c) dry-run writes zero bytes to the target", async () => {
     expect(readdirSync(target)).toEqual([]);
     const result = await copyPayload({ source, target, dryRun: true });
-    expect(result.copied).toHaveLength(4);
+    expect(result.copied).toHaveLength(3);
     expect(readdirSync(target)).toEqual([]);
   });
 
@@ -234,8 +232,5 @@ describe("copyPayload", () => {
     expect(byRel.get(join("skills", "lint", "SKILL.md"))).toBe("skill");
     expect(byRel.get(join("commands", "lint", "audit.md"))).toBe("command");
     expect(byRel.get(join("agents", "lint-detector.md"))).toBe("agent");
-    expect(
-      byRel.get(join("skills", "lint", "cli", "src", "index.ts")),
-    ).toBe("cli");
   });
 });

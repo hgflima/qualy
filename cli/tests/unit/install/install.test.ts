@@ -147,7 +147,7 @@ describe("installHarness", () => {
     expect(result.scope).toBe("project");
     expect(result.version).toBe("0.1.0");
     expect(result.target).toBe(join(workspace, ".claude"));
-    expect(result.copied).toBe(4);
+    expect(result.copied).toBe(3);
     expect(result.skipped).toBe(0);
     expect(result.dry_run).toBe(false);
     expect(result.manifest_overwritten).toBe(false);
@@ -168,7 +168,7 @@ describe("installHarness", () => {
     expect(m.scope).toBe("project");
     expect(m.harness_version).toBe("0.1.0");
     expect(m.installer).toBe("npx");
-    expect(m.entries.length).toBe(4);
+    expect(m.entries.length).toBe(3);
     for (const e of m.entries) {
       expect(e.sha256).toMatch(/^[0-9a-f]{64}$/);
     }
@@ -244,7 +244,7 @@ describe("installHarness", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.dry_run).toBe(true);
-    expect(result.copied).toBe(4);
+    expect(result.copied).toBe(3);
     // No .claude/ created at all.
     expect(existsSync(join(workspace, ".claude"))).toBe(false);
     // No .gitignore update on dry-run, even for local scope.
@@ -281,11 +281,11 @@ describe("installHarness", () => {
     if (!second.ok) return;
     expect(second.manifest_overwritten).toBe(true);
     expect(second.copied).toBe(0);
-    expect(second.skipped).toBe(4);
-    // Manifest still contains the full 4 entries (skipped files belong to the
+    expect(second.skipped).toBe(3);
+    // Manifest still contains the full 3 entries (skipped files belong to the
     // index too — uninstall reclaims them).
     const m = readManifest(join(workspace, ".claude")) as Manifest;
-    expect(m.entries.length).toBe(4);
+    expect(m.entries.length).toBe(3);
   });
 
   it("--scope project without .git/ returns scope_resolution error", async () => {
@@ -424,9 +424,6 @@ describe("manifest entries from install reflect copyPayload output", () => {
     expect(kinds.get(join("agents", "lint-detector.md"))).toBe("agent");
     expect(kinds.get(join("commands", "lint.md"))).toBe("command");
     expect(kinds.get(join("skills", "lint", "SKILL.md"))).toBe("skill");
-    expect(kinds.get(join("skills", "lint", "cli", "src", "index.ts"))).toBe(
-      "cli",
-    );
   });
 
   it("manifest file is written to ${target}/.lint-manifest.json", async () => {

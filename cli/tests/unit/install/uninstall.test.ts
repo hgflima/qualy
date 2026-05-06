@@ -244,14 +244,14 @@ describe("uninstallHarness", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.dry_run).toBe(true);
-    expect(result.removed.length).toBe(4);
+    expect(result.removed.length).toBe(3);
     // FS untouched.
     expect(existsSync(manifestPath(target))).toBe(true);
     expect(existsSync(join(target, "skills", "lint", "SKILL.md"))).toBe(true);
     // Manifest still readable + intact.
     const m = readManifest(target);
     expect(m).not.toBeNull();
-    expect(m!.entries.length).toBe(4);
+    expect(m!.entries.length).toBe(3);
   });
 
   it("entries already deleted from disk are reported in kept[] as already-absent", async () => {
@@ -281,8 +281,8 @@ describe("uninstallHarness", () => {
       path: join("commands", "lint.md"),
       reason: "already-absent",
     });
-    // Other three were removed normally.
-    expect(result.removed.length).toBe(3);
+    // The other two were removed normally.
+    expect(result.removed.length).toBe(2);
   });
 
   it("scope_resolution error: --scope project without .git/", async () => {

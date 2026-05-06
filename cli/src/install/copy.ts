@@ -1,23 +1,26 @@
 /**
  * Payload copy primitives for the harness installer.
  *
- * `walkPayload(source)` enumerates the four top-level directories the harness
- * ships (`skills/`, `commands/`, `agents/`, `cli/`) and yields every regular
- * file under them as a path relative to `source`. It deliberately skips
- * `cli/tests/` and `cli/node_modules/` (SPEC §4 — only the runtime payload is
- * shipped to the user's `.claude/`) and never follows symlinks. The latter
- * matters because the dev tree contains `skills/lint/cli` as a symlink back
- * to `cli/` for local iteration; following it would copy `cli/` twice (once
- * under its mapped target and once under the symlink).
+ * `walkPayload(source)` enumerates the three top-level directories the harness
+ * ships (`skills/`, `commands/`, `agents/`) and yields every regular file
+ * under them as a path relative to `source`. It never follows symlinks —
+ * the dev tree historically contained `skills/lint/cli` as a symlink back to
+ * `cli/`; following it would have copied the same subtree twice.
+ *
+ * The CLI source itself (`cli/`) is no longer part of the copied payload:
+ * v0.3.4 materializes the CLI runtime via `npm install @hgflima/qualy` into
+ * `${target}/skills/lint/node_modules/` (see `materialize-runtime.ts`),
+ * which gives the installed binary a real `node_modules/` to resolve
+ * dependencies against (Bug 1) and a real `package.json` two levels up
+ * from `bin/qualy.mjs` (Bug 2).
  *
  * `sha256File(abs)` streams the file through `createHash('sha256')` instead
  * of buffering it whole — TASKS.md 1.4 calls this out explicitly because
  * skill assets can be large enough to matter.
  *
  * `mapTarget(rel, target)` translates a source-relative path into the
- * corresponding absolute path inside the target scope:
- *   - `cli/...`                 → `${target}/skills/lint/cli/...`
- *   - `skills|commands|agents/` → `${target}/...` (identity prepend)
+ * corresponding absolute path inside the target scope (identity prepend
+ * for the three whitelisted top-level directories).
  *
  * `copyPayload(args)` is the orchestrator. It is idempotent (sha256 match on
  * an existing target → `skipped`), respects `dryRun` (no bytes written), and
@@ -37,6 +40,8 @@ import { dirname, join, relative, sep } from "node:path";
 
 import type { ManifestEntryKind } from "./manifest.ts";
 
+const TOP_LEVEL_DIRS = ["skills", "commands", "agents"] as const;
+
 export type PathEntry = {
   rel: string;
   abs: string;
@@ -55,13 +60,6 @@ export type CopyResult = {
   skipped: PathEntry[];
 };
 
-const TOP_LEVEL_DIRS = ["skills", "commands", "agents", "cli"] as const;
-
-const SKIP_RELATIVE = new Set<string>([
-  join("cli", "tests"),
-  join("cli", "node_modules"),
-]);
-
 export function* walkPayload(source: string): Generator<string> {
   for (const top of TOP_LEVEL_DIRS) {
     const dir = join(source, top);
@@ -71,7 +69,6 @@ export function* walkPayload(source: string): Generator<string> {
 }
 
 function* walkDir(source: string, dir: string): Generator<string> {
-  if (SKIP_RELATIVE.has(relative(source, dir))) return;
   const entries = readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
     if (entry.isSymbolicLink()) continue;
@@ -96,9 +93,6 @@ export function sha256File(abs: string): Promise<string> {
 
 export function mapTarget(rel: string, target: string): string {
   const parts = rel.split(sep);
-  if (parts[0] === "cli") {
-    return join(target, "skills", "lint", ...parts);
-  }
   return join(target, ...parts);
 }
 
@@ -149,8 +143,6 @@ function kindOf(sourceRel: string): ManifestEntryKind {
       return "command";
     case "agents":
       return "agent";
-    case "cli":
-      return "cli";
     default:
       return "other";
   }
