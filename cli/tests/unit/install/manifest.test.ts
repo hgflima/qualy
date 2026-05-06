@@ -100,4 +100,72 @@ describe("manifest", () => {
     expect(onDisk.endsWith("\n")).toBe(true);
     expect(JSON.parse(onDisk)).toEqual(m);
   });
+
+  it("round-trips a manifest entry with kind=runtime-node-modules", () => {
+    const m: Manifest = {
+      ...sampleManifest(),
+      entries: [
+        {
+          path: "skills/lint/node_modules",
+          sha256: "",
+          kind: "runtime-node-modules",
+        },
+      ],
+    };
+    writeManifest(scopeRoot, m);
+    const got = readManifest(scopeRoot);
+    expect(got).toEqual(m);
+    expect(got?.entries[0]?.kind).toBe("runtime-node-modules");
+  });
+
+  it("reads a legacy v0.3.3 manifest with no runtime entry without throwing", () => {
+    const legacy = {
+      version: "1",
+      scope: "local",
+      harness_version: "0.3.3",
+      installer: "npx",
+      installed_at: "2026-04-01T00:00:00.000Z",
+      entries: [
+        {
+          path: "skills/lint/SKILL.md",
+          sha256: "a".repeat(64),
+          kind: "skill",
+        },
+      ],
+    };
+    writeFileSync(manifestPath(scopeRoot), JSON.stringify(legacy), "utf8");
+    const got = readManifest(scopeRoot);
+    expect(got?.harness_version).toBe("0.3.3");
+    expect(got?.entries).toHaveLength(1);
+    expect(
+      got?.entries.some((e) => e.kind === "runtime-node-modules"),
+    ).toBe(false);
+  });
+
+  it("readManifest tolerates an entry with an unknown kind without throwing", () => {
+    // Locks in the forward-compat invariant: future kinds added in newer
+    // versions must not break older CLIs that read the same manifest. The
+    // reader does not validate the `kind` field — it returns the parsed
+    // payload as-is.
+    const future = {
+      version: "1",
+      scope: "local",
+      harness_version: "9.9.9",
+      installer: "npx",
+      installed_at: "2030-01-01T00:00:00.000Z",
+      entries: [
+        {
+          path: "skills/lint/future-thing",
+          sha256: "c".repeat(64),
+          kind: "future-unknown-kind",
+        },
+      ],
+    };
+    writeFileSync(manifestPath(scopeRoot), JSON.stringify(future), "utf8");
+    expect(() => readManifest(scopeRoot)).not.toThrow();
+    const got = readManifest(scopeRoot);
+    expect(got?.entries[0]?.kind).toBe(
+      "future-unknown-kind" as unknown as Manifest["entries"][number]["kind"],
+    );
+  });
 });

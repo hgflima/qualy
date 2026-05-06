@@ -27,6 +27,7 @@ export type ManifestEntryKind =
   | "command"
   | "agent"
   | "cli"
+  | "runtime-node-modules"
   | "other";
 
 export type ManifestEntry = {
