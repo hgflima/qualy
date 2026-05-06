@@ -20,12 +20,12 @@
 - [x] **T5** — 4 agents (`lint-auditor`, `lint-detector`, `lint-installer`, `lint-migrator`)
 - [x] **T6** — 6 commands top-level (`audit`, `report`, `rollback`, `setup`, `uninstall`, `update`)
 - [x] **T7** — 4 commands `ignore/*` (`add`, `explain`, `list`, `remove`)
-- [ ] **T8** — 4 commands `rules/*` (`add`, `explain`, `list`, `remove`)
+- [x] **T8** — 4 commands `rules/*` (`add`, `explain`, `list`, `remove`)
 
 ### ✅ Checkpoint B
-- [ ] `npx vitest run cli/tests/unit/preamble-parity.test.ts` verde
-- [ ] `grep -rln 'CLAUDE_PLUGIN_ROOT' --include="*.md" {skills,agents,commands}/` → 0
-- [ ] `grep -rln 'for cand in "\$PWD/.claude"' --include="*.md" {skills,agents,commands}/ | wc -l` → 19
+- [x] `npx vitest run cli/tests/unit/preamble-parity.test.ts` verde
+- [x] `grep -rln 'CLAUDE_PLUGIN_ROOT' --include="*.md" {skills,agents,commands}/` → 0
+- [x] `grep -rln 'for cand in "\$PWD/.claude"' --include="*.md" {skills,agents,commands}/ | wc -l` → 19
 
 ## Phase 3 — Documentação histórica (6 arquivos)
 
