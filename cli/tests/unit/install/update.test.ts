@@ -158,7 +158,7 @@ describe("updateHarness", () => {
     rmSync(workspace, { recursive: true, force: true });
   });
 
-  it("returns up-to-date when installed === latest", async () => {
+  it("returns up-to-date when installed === latest (and never calls applyInstall — T6)", async () => {
     await seedManifest(workspace, "0.1.0");
     const result = await updateHarness({
       scope: "project",
@@ -166,6 +166,7 @@ describe("updateHarness", () => {
       dryRun: false,
       yes: false,
       fetchLatestVersion: fakeFetch({ ok: true, version: "0.1.0" }),
+      applyInstall: applyExplodes,
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -174,7 +175,7 @@ describe("updateHarness", () => {
     expect(result.installed_after).toBe("0.1.0");
   });
 
-  it("installed > latest is reported as up-to-date (no downgrade)", async () => {
+  it("installed > latest is reported as up-to-date (no downgrade, no applyInstall — T6)", async () => {
     await seedManifest(workspace, "0.2.0");
     const result = await updateHarness({
       scope: "project",
@@ -182,6 +183,7 @@ describe("updateHarness", () => {
       dryRun: false,
       yes: false,
       fetchLatestVersion: fakeFetch({ ok: true, version: "0.1.0" }),
+      applyInstall: applyExplodes,
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -399,6 +401,89 @@ describe("updateHarness", () => {
       expect(result.error).toBe("registry_unknown");
       expect(result.reason).toMatch(/qualy update --dry-run/);
     });
+  });
+
+  it("bump path delegates to applyInstall which re-materializes runtime (T6)", async () => {
+    // Seed v0.1.0 install in the workspace.
+    await seedManifest(workspace, "0.1.0");
+
+    // Build a synthetic payload that represents the v0.2.0 harness so the
+    // wired-in `applyInstall` can run a real `installHarness` against it.
+    const fs = await import("node:fs");
+    const newPayload = mkdtempSync(join(tmpdir(), "qualy-update-newpayload-"));
+    fs.writeFileSync(
+      join(newPayload, "package.json"),
+      JSON.stringify({ name: "@hgflima/qualy", version: "0.2.0" }),
+      "utf8",
+    );
+    fs.mkdirSync(join(newPayload, "skills", "lint"), { recursive: true });
+    fs.writeFileSync(join(newPayload, "skills", "lint", "SKILL.md"), "v2\n");
+    fs.mkdirSync(join(newPayload, "commands"), { recursive: true });
+    fs.writeFileSync(join(newPayload, "commands", "lint.md"), "v2\n");
+    fs.mkdirSync(join(newPayload, "agents"), { recursive: true });
+    fs.writeFileSync(
+      join(newPayload, "agents", "lint-detector.md"),
+      "v2\n",
+    );
+
+    try {
+      const materializeCalls: Array<{
+        target: string;
+        packageSpec: string;
+        dryRun: boolean;
+      }> = [];
+      const recordingMaterialize: MaterializeRuntimeFn = async ({
+        target,
+        packageSpec,
+        dryRun,
+      }) => {
+        materializeCalls.push({ target, packageSpec, dryRun });
+        return {
+          ok: true,
+          stubCreated: null,
+          runtimePath: join(target, "skills", "lint"),
+        };
+      };
+
+      // Wire `applyInstall` to a real `installHarness` against the v0.2.0
+      // payload — this is the T6 invariant: the npx install reuses the install
+      // pipeline, which calls `materializeRuntime` for the new version.
+      const apply: ApplyInstall = async (args) => {
+        const r = await installHarness({
+          scope: args.scope,
+          cwd: args.cwd,
+          dryRun: false,
+          yes: true,
+          source: newPayload,
+          materialize: recordingMaterialize,
+        });
+        if (!r.ok) return { ok: false, reason: r.reason };
+        return { ok: true };
+      };
+
+      const result = await updateHarness({
+        scope: "project",
+        cwd: workspace,
+        dryRun: false,
+        yes: false,
+        fetchLatestVersion: fakeFetch({ ok: true, version: "0.2.0" }),
+        applyInstall: apply,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.status).toBe("updated");
+      expect(result.installed_after).toBe("0.2.0");
+
+      // The bump triggered exactly one materialize call, with the NEW version
+      // in the package spec — proving the re-materialization comes for free
+      // through the install pipeline (PLAN §6 / TASKS Task 6).
+      expect(materializeCalls).toHaveLength(1);
+      expect(materializeCalls[0]?.packageSpec).toBe("@hgflima/qualy@0.2.0");
+      expect(materializeCalls[0]?.dryRun).toBe(false);
+    } finally {
+      rmSync(newPayload, { recursive: true, force: true });
+    }
   });
 
   it("apply_failed when the spawned npx install reports non-zero", async () => {

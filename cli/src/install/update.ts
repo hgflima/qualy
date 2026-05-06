@@ -10,11 +10,24 @@
  *      registry failures to 4 named error kinds. All four exit `1` with a
  *      kind-specific message (TASKS 2.3 — "cobertura cobre as 4 classes").
  *   4. Compare `manifest.harness_version` vs `latest`:
- *        - equal or installed-greater → `up-to-date`, exit `0`.
+ *        - equal or installed-greater → `up-to-date`, exit `0`. `applyInstall`
+ *          is NOT invoked, which means the runtime `node_modules/` is left
+ *          untouched (no needless `npm install` on a no-op update).
  *        - latest > installed         → log `installed → latest`. On a major
  *          bump without `--yes` (and not `--dry-run`) prompt y/N via readline.
  *        - apply via `npx @hgflima/qualy@<latest> install --scope <X> --cwd <Y> --yes`
  *          unless `--dry-run` (which returns `would-update`).
+ *
+ * Runtime re-materialization (T6 / cli-bin-resolution):
+ *   The bump path delegates the entire reinstall to `npx @hgflima/qualy@<latest>
+ *   install`, which re-enters `installHarness` in the new package and runs
+ *   `materializeRuntime()` as part of the install pipeline. That spawns
+ *   `npm install --omit=dev --no-save @hgflima/qualy@<latest>` inside
+ *   `<scopeRoot>/skills/lint/`, refreshing the runtime tree to match the new
+ *   harness version. We intentionally do NOT duplicate that `npm install` here
+ *   — keeping it in `installHarness` means a single source of truth for
+ *   payload + runtime materialization (see `cli/src/install/install.ts` and
+ *   `cli/src/install/materialize-runtime.ts`).
  *
  * Output (single canonical JSON to stdout, SPEC §6):
  *   { ok, status: "up-to-date"|"updated"|"would-update", scope, target,
