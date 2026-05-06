@@ -15,6 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] — 2026-05-05
+
+### Fixed
+
+- **`qualy --version` reportava `0.0.0`** em vez da versão real do pacote
+  (`cli/src/index.ts` mantinha um literal hardcoded que não foi bumpado junto
+  com `package.json`). Agora a versão é lida dinamicamente do `package.json`
+  via `createRequire`, então `package.json` é a fonte única de verdade.
+
+---
+
 ## [0.3.0] — 2026-05-05
 
 ### Added

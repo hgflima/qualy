@@ -16,6 +16,7 @@
  *   - Stderr: NDJSON via logger plus the human-readable `--help` text.
  */
 import { realpathSync } from "node:fs";
+import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { runAudit } from "./commands/audit.ts";
 import { runAuditLatest } from "./commands/audit-latest.ts";
@@ -59,7 +60,10 @@ import { runReportServe } from "./commands/report/serve.ts";
 import { EXIT_CODES, type ExitCode } from "./lib/exit-codes.ts";
 import { logger, output } from "./lib/logger.ts";
 
-const VERSION = "0.0.0";
+const pkg = createRequire(import.meta.url)("../../package.json") as {
+  version: string;
+};
+const VERSION = pkg.version;
 const BIN_NAME = "qualy";
 
 export type Handler = (argv: readonly string[]) => Promise<ExitCode> | ExitCode;
