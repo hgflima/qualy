@@ -12,12 +12,28 @@ import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { installHarness } from "../../../src/install/install.ts";
+import {
+  installHarness,
+  type MaterializeRuntimeFn,
+} from "../../../src/install/install.ts";
 import {
   parseUninstallArgs,
   runHarnessUninstall,
   uninstallHarness,
 } from "../../../src/install/uninstall.ts";
+
+/**
+ * Stub materialize: never spawns npm and never writes a real `node_modules/`
+ * tree. The runtime-node-modules manifest entry it produces lands in the
+ * uninstaller's `kept[]` as `already-absent`. Once T5 teaches the uninstaller
+ * to `rm -rf` runtime entries, the kept[] expectations below will collapse
+ * back to whatever the fake leaves on disk (today: nothing extra).
+ */
+const fakeMaterialize: MaterializeRuntimeFn = async ({ target, dryRun }) => {
+  const runtimePath = join(target, "skills", "lint");
+  if (dryRun) return { ok: true, stubCreated: null, runtimePath };
+  return { ok: true, stubCreated: null, runtimePath };
+};
 import { manifestPath, readManifest } from "../../../src/install/manifest.ts";
 import { setStreams } from "../../../src/lib/logger.ts";
 import { EXIT_CODES } from "../../../src/lib/exit-codes.ts";
@@ -136,6 +152,7 @@ describe("uninstallHarness", () => {
       dryRun: false,
       yes: false,
       source,
+      materialize: fakeMaterialize,
     });
     expect(installed.ok).toBe(true);
 
@@ -157,7 +174,15 @@ describe("uninstallHarness", () => {
     expect(result.target).toBe(target);
     expect(result.dry_run).toBe(false);
     expect(result.removed.length).toBeGreaterThan(0);
-    expect(result.kept).toEqual([]);
+    // The manifest now also tracks `skills/lint/node_modules` (kind
+    // `runtime-node-modules`) — fakeMaterialize never creates that directory,
+    // so the entry resolves to `already-absent` here. T5 will teach uninstall
+    // to `rm -rf` runtime entries; once that lands, the kept[] entry below
+    // disappears.
+    expect(result.kept.map((k) => k.path)).toEqual([
+      join("skills", "lint", "node_modules"),
+    ]);
+    expect(result.kept[0]?.reason).toBe("already-absent");
 
     // Manifest is gone, payload files are gone, parent directory was
     // best-effort rmdir'd. The .claude directory itself may or may not
@@ -193,6 +218,7 @@ describe("uninstallHarness", () => {
       dryRun: false,
       yes: false,
       source,
+      materialize: fakeMaterialize,
     });
     const target = join(workspace, ".claude");
     // Orphan: a user-authored file under the scope, not tracked by manifest.
@@ -231,6 +257,7 @@ describe("uninstallHarness", () => {
       dryRun: false,
       yes: false,
       source,
+      materialize: fakeMaterialize,
     });
     const target = join(workspace, ".claude");
 
@@ -244,14 +271,15 @@ describe("uninstallHarness", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.dry_run).toBe(true);
-    expect(result.removed.length).toBe(3);
+    // 3 payload files + runtime-node-modules entry = 4 planned removals.
+    expect(result.removed.length).toBe(4);
     // FS untouched.
     expect(existsSync(manifestPath(target))).toBe(true);
     expect(existsSync(join(target, "skills", "lint", "SKILL.md"))).toBe(true);
     // Manifest still readable + intact.
     const m = readManifest(target);
     expect(m).not.toBeNull();
-    expect(m!.entries.length).toBe(3);
+    expect(m!.entries.length).toBe(4);
   });
 
   it("entries already deleted from disk are reported in kept[] as already-absent", async () => {
@@ -262,6 +290,7 @@ describe("uninstallHarness", () => {
       dryRun: false,
       yes: false,
       source,
+      materialize: fakeMaterialize,
     });
     const target = join(workspace, ".claude");
     // Manually delete one tracked file before uninstall.
@@ -276,12 +305,19 @@ describe("uninstallHarness", () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.kept.length).toBe(1);
-    expect(result.kept[0]).toEqual({
-      path: join("commands", "lint.md"),
-      reason: "already-absent",
-    });
-    // The other two were removed normally.
+    // Two `already-absent` entries: the manually-deleted lint.md plus the
+    // runtime-node-modules entry the fake materialize never wrote to disk
+    // (T5 will collapse the latter into a real recursive removal).
+    expect(result.kept.map((k) => k.path).toSorted()).toEqual(
+      [
+        join("commands", "lint.md"),
+        join("skills", "lint", "node_modules"),
+      ].toSorted(),
+    );
+    for (const k of result.kept) {
+      expect(k.reason).toBe("already-absent");
+    }
+    // The remaining two payload files were removed normally.
     expect(result.removed.length).toBe(2);
   });
 
@@ -308,6 +344,7 @@ describe("uninstallHarness", () => {
       dryRun: false,
       yes: false,
       source,
+      materialize: fakeMaterialize,
     });
     const target = join(workspace, ".claude");
     const result = await uninstallHarness({

@@ -24,11 +24,12 @@
  * synthetic payload tree without copying the real qualy repo. In production
  * `source` defaults to `findQualyRoot()`.
  */
+import { join } from "node:path";
 import type { Writable } from "node:stream";
 
 import { EXIT_CODES, type ExitCode } from "../lib/exit-codes.ts";
 import { logger, output } from "../lib/logger.ts";
-import { copyPayload, type CopyResult } from "./copy.ts";
+import { copyPayload, type CopyResult, sha256File } from "./copy.ts";
 import { RecoverableError } from "./errors.ts";
 import { appendIgnoreLine, type IgnoreAction } from "./gitignore.ts";
 import {
@@ -38,6 +39,10 @@ import {
   readManifest,
   writeManifest,
 } from "./manifest.ts";
+import {
+  materializeRuntime as defaultMaterializeRuntime,
+  type MaterializeRuntimeResult,
+} from "./materialize-runtime.ts";
 import { resolveScope, type Scope } from "./scope.ts";
 import {
   checkNodeVersion,
@@ -45,6 +50,26 @@ import {
   readPackageVersion,
   REQUIRED_NODE_VERSION,
 } from "./version.ts";
+
+/**
+ * Validates that a `packageSpec` is exactly `@hgflima/qualy@<semver-ish>` —
+ * no shell metacharacters, no whitespace. Defense in depth: the spec we
+ * construct internally already follows this shape, but `materializeRuntime`
+ * eventually hands it to `npm install` and we want a hard guard at the
+ * boundary (TASKS Task 3 critério #6).
+ */
+const PACKAGE_SPEC_RE = /^@hgflima\/qualy@[A-Za-z0-9.+-]+$/;
+
+function isValidPackageSpec(spec: string): boolean {
+  if (!PACKAGE_SPEC_RE.test(spec)) return false;
+  return !/[;&|\s]/.test(spec);
+}
+
+export type MaterializeRuntimeFn = (input: {
+  readonly target: string;
+  readonly packageSpec: string;
+  readonly dryRun: boolean;
+}) => Promise<MaterializeRuntimeResult>;
 
 const HELP_TEXT = `qualy install [--scope user|project|local] [--cwd <path>] [--dry-run] [--yes]
 
@@ -75,6 +100,8 @@ export type InstallOptions = {
   readonly yes: boolean;
   /** Override the payload source (test seam). Defaults to `findQualyRoot()`. */
   readonly source?: string;
+  /** Override `materializeRuntime` (test seam). Defaults to the real one. */
+  readonly materialize?: MaterializeRuntimeFn;
 };
 
 export type InstallOk = {
@@ -87,6 +114,9 @@ export type InstallOk = {
   readonly dry_run: boolean;
   readonly manifest_overwritten: boolean;
   readonly gitignore: { readonly action: IgnoreAction | "skipped" };
+  readonly runtime: {
+    readonly action: "materialized" | "skipped" | "dry-run";
+  };
 };
 
 export type InstallErr = {
@@ -95,6 +125,9 @@ export type InstallErr = {
     | "node_too_old"
     | "scope_resolution"
     | "payload_missing"
+    | "runtime_install_network"
+    | "runtime_install_fs"
+    | "runtime_install_unknown"
     | "internal";
   readonly reason: string;
   readonly detail?: Readonly<Record<string, unknown>>;
@@ -163,14 +196,61 @@ export async function installHarness(
     };
   }
 
+  const packageSpec = `@hgflima/qualy@${version}`;
+  if (!isValidPackageSpec(packageSpec)) {
+    return {
+      ok: false,
+      error: "internal",
+      reason: `invalid packageSpec derived from version: ${packageSpec}`,
+    };
+  }
+
+  const materialize = opts.materialize ?? defaultMaterializeRuntime;
+  const matResult = await materialize({
+    target: resolved.root,
+    packageSpec,
+    dryRun: opts.dryRun,
+  });
+  if (!matResult.ok) {
+    return {
+      ok: false,
+      error: matErrorToInstallError(matResult.error),
+      reason: matResult.reason,
+    };
+  }
+
   let gitignoreAction: IgnoreAction | "skipped" = "skipped";
   if (resolved.scope === "local" && !opts.dryRun) {
     gitignoreAction = appendIgnoreLine(opts.cwd, ".claude/");
   }
 
-  const entries: ManifestEntry[] = [...copyResult.copied, ...copyResult.skipped]
-    .map((e) => ({ path: e.rel, sha256: e.sha256, kind: e.kind }))
-    .toSorted((a, b) => a.path.localeCompare(b.path));
+  const payloadEntries: ManifestEntry[] = [
+    ...copyResult.copied,
+    ...copyResult.skipped,
+  ].map((e) => ({ path: e.rel, sha256: e.sha256, kind: e.kind }));
+
+  const runtimeEntries: ManifestEntry[] = [];
+  if (!opts.dryRun) {
+    runtimeEntries.push({
+      path: join("skills", "lint", "node_modules"),
+      sha256: "",
+      kind: "runtime-node-modules",
+    });
+    if (matResult.stubCreated !== null) {
+      const stubAbs = join(resolved.root, matResult.stubCreated);
+      const stubSha = await sha256File(stubAbs);
+      runtimeEntries.push({
+        path: matResult.stubCreated,
+        sha256: stubSha,
+        kind: "other",
+      });
+    }
+  }
+
+  const entries: ManifestEntry[] = [
+    ...payloadEntries,
+    ...runtimeEntries,
+  ].toSorted((a, b) => a.path.localeCompare(b.path));
 
   if (!opts.dryRun) {
     const manifest: Manifest = {
@@ -194,7 +274,16 @@ export async function installHarness(
     dry_run: opts.dryRun,
     manifest_overwritten: manifestOverwritten,
     gitignore: { action: gitignoreAction },
+    runtime: { action: opts.dryRun ? "dry-run" : "materialized" },
   };
+}
+
+function matErrorToInstallError(
+  code: "EQUALY_INSTALL_NETWORK" | "EQUALY_INSTALL_FS" | "EQUALY_INSTALL_UNKNOWN",
+): InstallErr["error"] {
+  if (code === "EQUALY_INSTALL_NETWORK") return "runtime_install_network";
+  if (code === "EQUALY_INSTALL_FS") return "runtime_install_fs";
+  return "runtime_install_unknown";
 }
 
 export type ParsedArgs = {

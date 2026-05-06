@@ -5,7 +5,16 @@ import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { installHarness } from "../../../src/install/install.ts";
+import {
+  installHarness,
+  type MaterializeRuntimeFn,
+} from "../../../src/install/install.ts";
+
+const fakeMaterialize: MaterializeRuntimeFn = async ({ target, dryRun }) => {
+  const runtimePath = join(target, "skills", "lint");
+  if (dryRun) return { ok: true, stubCreated: null, runtimePath };
+  return { ok: true, stubCreated: null, runtimePath };
+};
 import {
   type ApplyInstall,
   type ApplyInstallArgs,
@@ -55,6 +64,7 @@ async function seedManifest(
       dryRun: false,
       yes: false,
       source: payload,
+      materialize: fakeMaterialize,
     });
     if (!r.ok) throw new Error(`install seed failed: ${r.reason}`);
     return r.target;

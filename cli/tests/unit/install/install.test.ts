@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   installHarness,
+  type MaterializeRuntimeFn,
   parseInstallArgs,
   runHarnessInstall,
 } from "../../../src/install/install.ts";
@@ -23,8 +24,52 @@ import {
   manifestPath,
   readManifest,
 } from "../../../src/install/manifest.ts";
+import type { MaterializeRuntimeResult } from "../../../src/install/materialize-runtime.ts";
 import { setStreams } from "../../../src/lib/logger.ts";
 import { EXIT_CODES } from "../../../src/lib/exit-codes.ts";
+
+/**
+ * Default test seam for `materializeRuntime`: physically writes the stub
+ * `package.json` (so `sha256File` succeeds in install.ts) but never spawns
+ * `npm`. Mirrors the real materializer's idempotency: if a `package.json`
+ * already exists, returns `stubCreated: null`.
+ */
+function makeFakeMaterialize(
+  log?: { calls: { target: string; packageSpec: string; dryRun: boolean }[] },
+): MaterializeRuntimeFn {
+  return async ({ target, packageSpec, dryRun }) => {
+    log?.calls.push({ target, packageSpec, dryRun });
+    const runtimePath = join(target, "skills", "lint");
+    if (dryRun) {
+      return { ok: true, stubCreated: null, runtimePath };
+    }
+    mkdirSync(runtimePath, { recursive: true });
+    const stubAbs = join(runtimePath, "package.json");
+    let stubCreated: string | null = null;
+    if (!existsSync(stubAbs)) {
+      writeFileSync(
+        stubAbs,
+        `${JSON.stringify({ name: "qualy-runtime", private: true }, null, 2)}\n`,
+        "utf8",
+      );
+      stubCreated = join("skills", "lint", "package.json");
+    }
+    // Materialize a placeholder node_modules so manifest invariants
+    // exercised by uninstall-style tests downstream still hold.
+    mkdirSync(join(runtimePath, "node_modules"), { recursive: true });
+    return { ok: true, stubCreated, runtimePath };
+  };
+}
+
+const failingMaterialize =
+  (
+    error:
+      | "EQUALY_INSTALL_NETWORK"
+      | "EQUALY_INSTALL_FS"
+      | "EQUALY_INSTALL_UNKNOWN",
+    reason: string,
+  ): MaterializeRuntimeFn =>
+  async () => ({ ok: false, error, reason }) satisfies MaterializeRuntimeResult;
 
 /**
  * Build a synthetic qualy distribution rooted at `root` with the four
@@ -140,6 +185,7 @@ describe("installHarness", () => {
       dryRun: false,
       yes: false,
       source,
+      materialize: makeFakeMaterialize(),
     });
 
     expect(result.ok).toBe(true);
@@ -152,6 +198,7 @@ describe("installHarness", () => {
     expect(result.dry_run).toBe(false);
     expect(result.manifest_overwritten).toBe(false);
     expect(result.gitignore.action).toBe("skipped");
+    expect(result.runtime.action).toBe("materialized");
 
     expect(
       readFileSync(
@@ -168,10 +215,25 @@ describe("installHarness", () => {
     expect(m.scope).toBe("project");
     expect(m.harness_version).toBe("0.1.0");
     expect(m.installer).toBe("npx");
-    expect(m.entries.length).toBe(3);
+    // 3 payload files + runtime-node-modules entry + stub package.json entry.
+    expect(m.entries.length).toBe(5);
     for (const e of m.entries) {
-      expect(e.sha256).toMatch(/^[0-9a-f]{64}$/);
+      if (e.kind === "runtime-node-modules") {
+        expect(e.sha256).toBe("");
+      } else {
+        expect(e.sha256).toMatch(/^[0-9a-f]{64}$/);
+      }
     }
+    const runtime = m.entries.filter(
+      (e) => e.kind === "runtime-node-modules",
+    );
+    expect(runtime).toHaveLength(1);
+    expect(runtime[0]?.path).toBe(join("skills", "lint", "node_modules"));
+    const stub = m.entries.filter(
+      (e) => e.path === join("skills", "lint", "package.json"),
+    );
+    expect(stub).toHaveLength(1);
+    expect(stub[0]?.kind).toBe("other");
     // .gitignore must NOT have been touched in project scope.
     expect(existsSync(join(workspace, ".gitignore"))).toBe(false);
   });
@@ -183,6 +245,7 @@ describe("installHarness", () => {
       dryRun: false,
       yes: false,
       source,
+      materialize: makeFakeMaterialize(),
     });
 
     expect(result.ok).toBe(true);
@@ -202,6 +265,7 @@ describe("installHarness", () => {
       dryRun: false,
       yes: false,
       source,
+      materialize: makeFakeMaterialize(),
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -219,6 +283,7 @@ describe("installHarness", () => {
         dryRun: false,
         yes: false,
         source,
+        materialize: makeFakeMaterialize(),
       });
       expect(result.ok).toBe(true);
       if (!result.ok) return;
@@ -234,17 +299,22 @@ describe("installHarness", () => {
 
   it("--dry-run reports the plan without touching the FS", async () => {
     gitInit(workspace);
+    const log = { calls: [] as { dryRun: boolean }[] };
     const result = await installHarness({
       scope: "project",
       cwd: workspace,
       dryRun: true,
       yes: false,
       source,
+      materialize: makeFakeMaterialize(log),
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.dry_run).toBe(true);
     expect(result.copied).toBe(3);
+    expect(result.runtime.action).toBe("dry-run");
+    // materialize was invoked but with dryRun=true — fake never wrote anything.
+    expect(log.calls.every((c) => c.dryRun)).toBe(true);
     // No .claude/ created at all.
     expect(existsSync(join(workspace, ".claude"))).toBe(false);
     // No .gitignore update on dry-run, even for local scope.
@@ -254,6 +324,7 @@ describe("installHarness", () => {
       dryRun: true,
       yes: false,
       source,
+      materialize: makeFakeMaterialize(),
     });
     expect(localResult.ok).toBe(true);
     if (!localResult.ok) return;
@@ -269,6 +340,7 @@ describe("installHarness", () => {
       dryRun: false,
       yes: false,
       source,
+      materialize: makeFakeMaterialize(),
     });
     const second = await installHarness({
       scope: "project",
@@ -276,16 +348,104 @@ describe("installHarness", () => {
       dryRun: false,
       yes: false,
       source,
+      materialize: makeFakeMaterialize(),
     });
     expect(second.ok).toBe(true);
     if (!second.ok) return;
     expect(second.manifest_overwritten).toBe(true);
     expect(second.copied).toBe(0);
     expect(second.skipped).toBe(3);
-    // Manifest still contains the full 3 entries (skipped files belong to the
-    // index too — uninstall reclaims them).
+    // 3 payload entries + runtime-node-modules entry. Stub already exists
+    // from first install so materialize returns stubCreated:null and we do
+    // not duplicate the "other" entry.
     const m = readManifest(join(workspace, ".claude")) as Manifest;
-    expect(m.entries.length).toBe(3);
+    expect(m.entries.length).toBe(4);
+    expect(
+      m.entries.filter((e) => e.kind === "runtime-node-modules"),
+    ).toHaveLength(1);
+    expect(
+      m.entries.filter((e) => e.path === join("skills", "lint", "package.json")),
+    ).toHaveLength(0);
+  });
+
+  it("propagates materializeRuntime errors as runtime_install_* and skips manifest write", async () => {
+    gitInit(workspace);
+    const result = await installHarness({
+      scope: "project",
+      cwd: workspace,
+      dryRun: false,
+      yes: false,
+      source,
+      materialize: failingMaterialize(
+        "EQUALY_INSTALL_NETWORK",
+        "ENOTFOUND registry.npmjs.org",
+      ),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe("runtime_install_network");
+    expect(result.reason).toMatch(/ENOTFOUND/);
+    // Manifest must not exist — materialize failed before write.
+    expect(existsSync(manifestPath(join(workspace, ".claude")))).toBe(false);
+  });
+
+  it.each([
+    ["EQUALY_INSTALL_FS" as const, "runtime_install_fs" as const],
+    ["EQUALY_INSTALL_UNKNOWN" as const, "runtime_install_unknown" as const],
+  ])("maps %s to %s", async (matErr, installErr) => {
+    gitInit(workspace);
+    const result = await installHarness({
+      scope: "project",
+      cwd: workspace,
+      dryRun: false,
+      yes: false,
+      source,
+      materialize: failingMaterialize(matErr, "boom"),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe(installErr);
+  });
+
+  it("calls copy → materialize → manifest write in order", async () => {
+    gitInit(workspace);
+    const order: string[] = [];
+    const materialize: MaterializeRuntimeFn = async ({ target, dryRun }) => {
+      order.push("materialize");
+      // The payload must already exist on disk by the time we run.
+      expect(
+        existsSync(
+          join(workspace, ".claude", "skills", "lint", "SKILL.md"),
+        ),
+      ).toBe(true);
+      // The manifest must NOT yet have been written.
+      expect(existsSync(manifestPath(target))).toBe(false);
+      const runtimePath = join(target, "skills", "lint");
+      mkdirSync(runtimePath, { recursive: true });
+      const stubAbs = join(runtimePath, "package.json");
+      let stubCreated: string | null = null;
+      if (!existsSync(stubAbs)) {
+        writeFileSync(
+          stubAbs,
+          `${JSON.stringify({ name: "qualy-runtime", private: true }, null, 2)}\n`,
+          "utf8",
+        );
+        stubCreated = join("skills", "lint", "package.json");
+      }
+      void dryRun;
+      return { ok: true, stubCreated, runtimePath };
+    };
+    const result = await installHarness({
+      scope: "project",
+      cwd: workspace,
+      dryRun: false,
+      yes: false,
+      source,
+      materialize,
+    });
+    expect(result.ok).toBe(true);
+    expect(order).toEqual(["materialize"]);
+    expect(existsSync(manifestPath(join(workspace, ".claude")))).toBe(true);
   });
 
   it("--scope project without .git/ returns scope_resolution error", async () => {
@@ -296,6 +456,7 @@ describe("installHarness", () => {
       dryRun: false,
       yes: false,
       source,
+      materialize: makeFakeMaterialize(),
     });
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -315,6 +476,7 @@ describe("installHarness", () => {
         dryRun: false,
         yes: false,
         source,
+        materialize: makeFakeMaterialize(),
       });
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -337,6 +499,7 @@ describe("installHarness", () => {
         dryRun: false,
         yes: false,
         source: bogus,
+        materialize: makeFakeMaterialize(),
       });
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -416,6 +579,7 @@ describe("manifest entries from install reflect copyPayload output", () => {
       dryRun: false,
       yes: false,
       source,
+      materialize: makeFakeMaterialize(),
     });
     const m = readManifest(join(workspace, ".claude")) as Manifest;
     const paths = m.entries.map((e) => e.path);
@@ -424,6 +588,10 @@ describe("manifest entries from install reflect copyPayload output", () => {
     expect(kinds.get(join("agents", "lint-detector.md"))).toBe("agent");
     expect(kinds.get(join("commands", "lint.md"))).toBe("command");
     expect(kinds.get(join("skills", "lint", "SKILL.md"))).toBe("skill");
+    expect(kinds.get(join("skills", "lint", "node_modules"))).toBe(
+      "runtime-node-modules",
+    );
+    expect(kinds.get(join("skills", "lint", "package.json"))).toBe("other");
   });
 
   it("manifest file is written to ${target}/.lint-manifest.json", async () => {
@@ -433,6 +601,7 @@ describe("manifest entries from install reflect copyPayload output", () => {
       dryRun: false,
       yes: false,
       source,
+      materialize: makeFakeMaterialize(),
     });
     expect(existsSync(manifestPath(join(workspace, ".claude")))).toBe(true);
     // Sanity: target directory has skills/, commands/, agents/, plus manifest.
