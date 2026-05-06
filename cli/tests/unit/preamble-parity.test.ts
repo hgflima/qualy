@@ -95,6 +95,10 @@ const MIGRATED: ReadonlySet<string> = new Set<string>([
   "commands/lint/setup.md",
   "commands/lint/uninstall.md",
   "commands/lint/update.md",
+  "commands/lint/ignore/add.md",
+  "commands/lint/ignore/explain.md",
+  "commands/lint/ignore/list.md",
+  "commands/lint/ignore/remove.md",
 ]);
 
 function readFunctional(relPath: string): string {

@@ -19,7 +19,7 @@
 - [x] **T4** — `skills/lint/SKILL.md`
 - [x] **T5** — 4 agents (`lint-auditor`, `lint-detector`, `lint-installer`, `lint-migrator`)
 - [x] **T6** — 6 commands top-level (`audit`, `report`, `rollback`, `setup`, `uninstall`, `update`)
-- [ ] **T7** — 4 commands `ignore/*` (`add`, `explain`, `list`, `remove`)
+- [x] **T7** — 4 commands `ignore/*` (`add`, `explain`, `list`, `remove`)
 - [ ] **T8** — 4 commands `rules/*` (`add`, `explain`, `list`, `remove`)
 
 ### ✅ Checkpoint B
