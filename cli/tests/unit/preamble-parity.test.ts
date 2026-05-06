@@ -1,19 +1,21 @@
 /**
  * Preamble parity across the 19 functional .md files
- * (SPEC §6 + §7 + ADR 0013, .harn/docs/fixes/scope-resolution/).
+ * (SPEC §6 + §7 + ADR 0013, .harn/docs/fixes/scope-resolution/;
+ * canonical block updated in v0.3.4 — see
+ * .harn/docs/cli-bin-resolution/SPEC.md §4).
  *
  * Every functional `.md` file (the SKILL, the four `lint-*` agents and
  * the 14 `commands/lint/**` slash commands) must embed the canonical
- * `$PWD → $HOME` probe block byte-for-byte. Drift between any two files
- * is a regression — a single byte off and operators get inconsistent
- * resolution / error messages depending on which entry point they hit.
+ * `$QUALY_DEV_BIN → $PWD → $HOME` probe block byte-for-byte. Drift
+ * between any two files is a regression — a single byte off and
+ * operators get inconsistent resolution / error messages depending on
+ * which entry point they hit.
  *
- * Migration is staged across tasks T4–T8: each task migrates a subgroup
- * and adds the corresponding paths to `MIGRATED`. The per-file parity
- * assertions skip until a path is moved into that set, so backpressure
- * stays green throughout Phase 2 while still flipping each file's check
- * to "real" the moment it is touched. Once T8 lands, `MIGRATED.size`
- * equals `FUNCTIONAL_FILES.length` and the suite exercises every probe.
+ * Migration is staged across two tasks (T7a, T7b): SKILL.md + the 14
+ * commands flip first, then the 4 agents. While T7a is in flight the
+ * `MIGRATED` set excludes the agents so backpressure stays green; once
+ * T7b lands the set covers all 19 files and the suite exercises every
+ * probe.
  */
 import { globSync, readFileSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
@@ -28,16 +30,22 @@ const REPO_ROOT = join(
 );
 
 /**
- * The canonical 5-line probe block, frozen by ADR 0013 / SPEC §6.
+ * The canonical probe block, frozen by SPEC §4 of cli-bin-resolution.
  * The trailing `node ...` line is intentionally excluded — its
  * `<subcommand>` token varies per file.
  */
 const CANONICAL_PROBE = [
-  'QUALY_CLI=""',
-  'for cand in "$PWD/.claude" "$HOME/.claude"; do',
-  '  [ -f "$cand/skills/lint/cli/src/index.ts" ] && QUALY_CLI="$cand/skills/lint/cli/src/index.ts" && break',
-  "done",
-  '[ -z "$QUALY_CLI" ] && { echo "qualy CLI not found in \\$PWD/.claude or \\$HOME/.claude. Run \\`qualy install\\` first." >&2; exit 5; }',
+  'QUALY_BIN=""',
+  "# Dev override (uso interno do repo qualy): aponta para bin/qualy.mjs local.",
+  '[ -n "$QUALY_DEV_BIN" ] && [ -f "$QUALY_DEV_BIN" ] && QUALY_BIN="$QUALY_DEV_BIN"',
+  "# Lookup padrão: cópia materializada por `qualy install`.",
+  'if [ -z "$QUALY_BIN" ]; then',
+  '  for cand in "$PWD/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs" \\',
+  '              "$HOME/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs"; do',
+  '    [ -f "$cand" ] && QUALY_BIN="$cand" && break',
+  "  done",
+  "fi",
+  '[ -z "$QUALY_BIN" ] && { echo "qualy not installed. Run \\`npx @hgflima/qualy install\\` first." >&2; exit 5; }',
 ].join("\n");
 
 function escapeRegex(s: string): string {
@@ -75,20 +83,10 @@ const FUNCTIONAL_FILES = [
 
 /**
  * Paths whose preamble has been migrated to the canonical block.
- * Populated incrementally by T4–T8. Empty after T2 (this task) lands.
- *
- *   T4 → "skills/lint/SKILL.md"
- *   T5 → the four "agents/lint-*.md"
- *   T6 → the six "commands/lint/{audit,report,rollback,setup,uninstall,update}.md"
- *   T7 → the four "commands/lint/ignore/*.md"
- *   T8 → the four "commands/lint/rules/*.md"
+ * T7a flips SKILL.md + the 14 commands; T7b adds the four agents.
  */
 const MIGRATED: ReadonlySet<string> = new Set<string>([
   "skills/lint/SKILL.md",
-  "agents/lint-auditor.md",
-  "agents/lint-detector.md",
-  "agents/lint-installer.md",
-  "agents/lint-migrator.md",
   "commands/lint/audit.md",
   "commands/lint/report.md",
   "commands/lint/rollback.md",
@@ -141,9 +139,12 @@ describe("preamble parity — canonical probe block", () => {
       ["skills/**/*.md", "agents/**/*.md", "commands/**/*.md"],
       { cwd: REPO_ROOT },
     );
+    // Match either the legacy `QUALY_CLI=` (pre-T7b agents) or the new
+    // `QUALY_BIN=` initializer; both are guaranteed to appear exactly
+    // once per functional file (in the probe block) until T7b lands.
     const found = candidates
       .map((p) => p.split(sep).join("/"))
-      .filter((p) => /QUALY_CLI=/.test(readFunctional(p)));
+      .filter((p) => /QUALY_(CLI|BIN)=""/.test(readFunctional(p)));
     expect(found.sort()).toEqual([...FUNCTIONAL_FILES].sort());
   });
 });
@@ -158,9 +159,13 @@ describe("preamble parity — extractProbeBlock helper", () => {
     expect(extractProbeBlock("nothing here")).toBeNull();
   });
 
-  it("returns null for the legacy CLAUDE_PLUGIN_ROOT one-liner", () => {
-    const legacy =
-      'QUALY_CLI="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude}/skills/lint/cli/src/index.ts"';
+  it("returns null for the legacy QUALY_CLI probe (v0.3.3)", () => {
+    const legacy = [
+      'QUALY_CLI=""',
+      'for cand in "$PWD/.claude" "$HOME/.claude"; do',
+      '  [ -f "$cand/skills/lint/cli/src/index.ts" ] && QUALY_CLI="$cand/skills/lint/cli/src/index.ts" && break',
+      "done",
+    ].join("\n");
     expect(extractProbeBlock(legacy)).toBeNull();
   });
 });

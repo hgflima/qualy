@@ -10,7 +10,7 @@ Router conversacional para a família `/lint:*`. Não modifica nada por conta pr
 
 ## Visão Geral
 
-A skill instala e gerencia oxlint + oxfmt + `quality-metrics` em projetos TS/TSX/JS/JSX, calibra thresholds por estágio (greenfield / brownfield-moderate / legacy), expõe um report visual de qualidade e suporta rollback. A lógica determinística vive em `cli/src/` (CLI TypeScript invocado via `--experimental-strip-types`); este `.md` é o orquestrador fino.
+A skill instala e gerencia oxlint + oxfmt + `quality-metrics` em projetos TS/TSX/JS/JSX, calibra thresholds por estágio (greenfield / brownfield-moderate / legacy), expõe um report visual de qualidade e suporta rollback. A lógica determinística vive em `cli/src/` (CLI TypeScript shippado no pacote npm; entrypoint via `bin/qualy.mjs`); este `.md` é o orquestrador fino.
 
 ## Quando usar
 
@@ -33,15 +33,21 @@ A skill instala e gerencia oxlint + oxfmt + `quality-metrics` em projetos TS/TSX
 Todo subcomando do harness usa o mesmo preâmbulo (definido aqui uma vez, reutilizado em `commands/lint/*.md` e `agents/lint-*.md`):
 
 ```bash
-QUALY_CLI=""
-for cand in "$PWD/.claude" "$HOME/.claude"; do
-  [ -f "$cand/skills/lint/cli/src/index.ts" ] && QUALY_CLI="$cand/skills/lint/cli/src/index.ts" && break
-done
-[ -z "$QUALY_CLI" ] && { echo "qualy CLI not found in \$PWD/.claude or \$HOME/.claude. Run \`qualy install\` first." >&2; exit 5; }
-node --experimental-strip-types "$QUALY_CLI" <subcommand> --cwd "$PWD" "$@"
+QUALY_BIN=""
+# Dev override (uso interno do repo qualy): aponta para bin/qualy.mjs local.
+[ -n "$QUALY_DEV_BIN" ] && [ -f "$QUALY_DEV_BIN" ] && QUALY_BIN="$QUALY_DEV_BIN"
+# Lookup padrão: cópia materializada por `qualy install`.
+if [ -z "$QUALY_BIN" ]; then
+  for cand in "$PWD/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs" \
+              "$HOME/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs"; do
+    [ -f "$cand" ] && QUALY_BIN="$cand" && break
+  done
+fi
+[ -z "$QUALY_BIN" ] && { echo "qualy not installed. Run \`npx @hgflima/qualy install\` first." >&2; exit 5; }
+node "$QUALY_BIN" <subcommand> --cwd "$PWD" "$@"
 ```
 
-O probe testa `$PWD/.claude` antes de `$HOME/.claude`, cobrindo os 3 scopes documentados por `qualy install` (ADR 0010): `project`/`local` (`${cwd}/.claude`, default) e `user` (`${HOME}/.claude`). Sem CLI em nenhum dos dois caminhos, sai com exit 5 (`MISSING_DEP`) e mensagem em stderr apontando `qualy install`. Justificativa e alternativas em `docs/adrs/0013-scope-resolution-probe.md`.
+O probe testa `$PWD/.claude` antes de `$HOME/.claude`, cobrindo os 3 scopes documentados por `qualy install` (ADR 0010): `project`/`local` (`${cwd}/.claude`, default) e `user` (`${HOME}/.claude`). `QUALY_DEV_BIN` é um override opcional para uso no repo qualy (aponta para `bin/qualy.mjs` do checkout). Sem bin em nenhum caminho, sai com exit 5 (`MISSING_DEP`) e mensagem em stderr apontando `npx @hgflima/qualy install`. Justificativa e alternativas em `docs/adrs/0013-scope-resolution-probe.md`.
 
 Saída padrão do CLI:
 
@@ -80,7 +86,7 @@ Mapeamento sugerido para mensagens user-friendly:
 
 ## Verificação
 
-- Smoke por iteração: `node --experimental-strip-types "$QUALY_CLI" --help` lista os subcomandos.
+- Smoke por iteração: `node "$QUALY_BIN" --help` lista os subcomandos.
 - Smoke `/lint:status`: roda em qualquer cwd, imprime versões, presets, estágio, hooks, coverage, theme — exit `0`.
 - E2E (PLAN §Fase 2 verificação): `/lint:setup` num fixture `greenfield-ts` produz todos os artefatos do SPEC §7.1 (`oxlint.fast.json`, `oxlint.deep.json`, `.claude/hooks/post-edit.sh`, `.husky/pre-commit`, `package.json#scripts`, `.lint-manifest.json`).
 

@@ -104,20 +104,32 @@ describe("commands/lint/ignore/explain.md — required sections", () => {
 });
 
 describe("commands/lint/ignore/explain.md — CLI surface", () => {
-  it("uses the canonical $PWD → $HOME probe block (ADR 0013)", () => {
-    expect(TEXT).toMatch(
-      /QUALY_CLI=""\nfor cand in "\$PWD\/\.claude" "\$HOME\/\.claude"; do\n {2}\[ -f "\$cand\/skills\/lint\/cli\/src\/index\.ts" \] && QUALY_CLI="\$cand\/skills\/lint\/cli\/src\/index\.ts" && break\ndone/,
+  it("uses the canonical $QUALY_DEV_BIN → $PWD → $HOME probe block (cli-bin-resolution SPEC §4)", () => {
+    expect(TEXT).toContain('QUALY_BIN=""');
+    expect(TEXT).toContain(
+      '[ -n "$QUALY_DEV_BIN" ] && [ -f "$QUALY_DEV_BIN" ] && QUALY_BIN="$QUALY_DEV_BIN"',
+    );
+    expect(TEXT).toContain(
+      '"$PWD/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs"',
+    );
+    expect(TEXT).toContain(
+      '"$HOME/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs"',
     );
   });
 
   it("fails with exit 5 (MISSING_DEP) when the probe finds nothing", () => {
-    expect(TEXT).toMatch(
-      /\[ -z "\$QUALY_CLI" \] && \{ echo "qualy CLI not found in \\\$PWD\/\.claude or \\\$HOME\/\.claude\. Run \\`qualy install\\` first\." >&2; exit 5; \}/,
+    expect(TEXT).toContain(
+      '[ -z "$QUALY_BIN" ] && { echo "qualy not installed. Run \\`npx @hgflima/qualy install\\` first." >&2; exit 5; }',
     );
   });
 
   it("does not reference the legacy CLAUDE_PLUGIN_ROOT env var (ADR 0013)", () => {
     expect(TEXT).not.toMatch(/CLAUDE_PLUGIN_ROOT/);
+  });
+
+  it("does not reference the legacy QUALY_CLI variable (cli-bin-resolution v0.3.4)", () => {
+    expect(TEXT).not.toMatch(/QUALY_CLI/);
+    expect(TEXT).not.toMatch(/cli\/src\/index\.ts/);
   });
 
   it("delegates to ignore-explain (CLI subcommand)", () => {

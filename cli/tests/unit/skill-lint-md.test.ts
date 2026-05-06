@@ -120,18 +120,28 @@ describe("skills/lint/SKILL.md — required sections (SPEC §4 line 295)", () =>
   });
 });
 
-describe("skills/lint/SKILL.md — Resolução do CLI preamble (ADR 0013)", () => {
-  it("uses the canonical $PWD → $HOME probe block (ADR 0013)", () => {
-    // ADR 0013 / SPEC §6: 5-line probe replaces the legacy CLAUDE_PLUGIN_ROOT one-liner.
-    expect(TEXT).toMatch(
-      /QUALY_CLI=""\nfor cand in "\$PWD\/\.claude" "\$HOME\/\.claude"; do\n {2}\[ -f "\$cand\/skills\/lint\/cli\/src\/index\.ts" \] && QUALY_CLI="\$cand\/skills\/lint\/cli\/src\/index\.ts" && break\ndone/,
+describe("skills/lint/SKILL.md — Resolução do CLI preamble (cli-bin-resolution SPEC §4)", () => {
+  it("uses the canonical $QUALY_DEV_BIN → $PWD → $HOME probe block", () => {
+    // cli-bin-resolution SPEC §4: probe consults dev override first,
+    // then walks `$PWD/.claude/skills/lint/node_modules/...` and finally
+    // `$HOME/.claude/skills/lint/node_modules/...`.
+    expect(TEXT).toContain('QUALY_BIN=""');
+    expect(TEXT).toContain(
+      '[ -n "$QUALY_DEV_BIN" ] && [ -f "$QUALY_DEV_BIN" ] && QUALY_BIN="$QUALY_DEV_BIN"',
+    );
+    expect(TEXT).toContain(
+      '"$PWD/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs"',
+    );
+    expect(TEXT).toContain(
+      '"$HOME/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs"',
     );
   });
 
   it("fails with exit 5 (MISSING_DEP) when the probe finds nothing", () => {
-    // ADR 0013: probe falls through to `exit 5` with stderr message pointing at `qualy install`.
-    expect(TEXT).toMatch(
-      /\[ -z "\$QUALY_CLI" \] && \{ echo "qualy CLI not found in \\\$PWD\/\.claude or \\\$HOME\/\.claude\. Run \\`qualy install\\` first\." >&2; exit 5; \}/,
+    // cli-bin-resolution SPEC §4: stderr message routes the user at the
+    // canonical `npx @hgflima/qualy install` recovery path.
+    expect(TEXT).toContain(
+      '[ -z "$QUALY_BIN" ] && { echo "qualy not installed. Run \\`npx @hgflima/qualy install\\` first." >&2; exit 5; }',
     );
   });
 
@@ -139,9 +149,17 @@ describe("skills/lint/SKILL.md — Resolução do CLI preamble (ADR 0013)", () =
     expect(TEXT).not.toMatch(/CLAUDE_PLUGIN_ROOT/);
   });
 
-  it("invokes node with --experimental-strip-types (ADR 0007)", () => {
-    // PLAN line 198: node --experimental-strip-types "$QUALY_CLI" <subcommand>
-    expect(TEXT).toMatch(/node --experimental-strip-types "\$QUALY_CLI"/);
+  it("does not reference the legacy QUALY_CLI variable (cli-bin-resolution v0.3.4)", () => {
+    expect(TEXT).not.toMatch(/QUALY_CLI/);
+    expect(TEXT).not.toMatch(/cli\/src\/index\.ts/);
+  });
+
+  it("invokes the materialized bin via `node \"$QUALY_BIN\"`", () => {
+    // cli-bin-resolution SPEC §4: tsx loader is now embedded in
+    // `bin/qualy.mjs`, so the slash command Bash just spawns node on
+    // that shim — no `--experimental-strip-types` required at this
+    // layer.
+    expect(TEXT).toContain('node "$QUALY_BIN"');
   });
 
   it("documents the canonical CLI output discipline (stdout JSON + stderr NDJSON)", () => {

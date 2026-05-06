@@ -1,24 +1,17 @@
 /**
- * E2E test of the canonical preamble probe defined by ADR 0013 / SPEC §6
- * (`.harn/docs/fixes/scope-resolution/`).
+ * E2E test of the canonical preamble probe defined by SPEC §4 of
+ * cli-bin-resolution (v0.3.4 — `.harn/docs/cli-bin-resolution/`).
  *
- * The probe is the bash snippet every functional `.md` file embeds before
- * invoking `node --experimental-strip-types $QUALY_CLI <sub>`. Its job is
- * to walk `$PWD/.claude` → `$HOME/.claude` looking for the lint CLI source,
- * then exit 5 with a clear stderr message when nothing is on disk.
+ * The probe is the bash snippet every functional `.md` file embeds
+ * before invoking `node "$QUALY_BIN" <sub>`. Its job is to consult
+ * `$QUALY_DEV_BIN` (dev override) → `$PWD/.claude/...` → `$HOME/.claude/...`
+ * looking for the materialized lint runtime, then exit 5 with a clear
+ * stderr message when nothing is on disk.
  *
- * This file does not depend on any of the 19 functional `.md` migrations
- * (Phase 2): the snippet is exercised as a *string literal* matching the
- * frozen block in SPEC §6 — so the test goes green the moment T1 / T2 land
- * and stays green through the whole migration. The only line we substitute
- * is the trailing `node ...` invocation, replaced by `echo "$QUALY_CLI"`
- * so we can assert on the resolved path without needing Node or the CLI.
- *
- * Bash invocation uses `--noprofile --norc` and a fully-explicit `env` to
- * avoid leakage from the parent shell (HOME / PWD / random user dotfiles).
- * Both `cwd` and `PWD` are set so bash and the script see the same dir.
- *
- * Scenarios mirror SPEC §7 (the table of four resolution cases).
+ * Bash invocation uses `--noprofile --norc` and a fully-explicit `env`
+ * to avoid leakage from the parent shell (HOME / PWD / random user
+ * dotfiles). Both `cwd` and `PWD` are set so bash and the script see
+ * the same dir.
  */
 import { spawnSync } from "node:child_process";
 import {
@@ -33,19 +26,25 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 /**
- * Canonical 5-line probe (frozen by ADR 0013 / SPEC §6) with a final
- * `echo "$QUALY_CLI"` instead of the production `node ...` line. Keeping
- * the probe block as the SPEC defines it byte-for-byte is what locks this
- * test to the same contract the unit-paired `preamble-parity.test.ts`
- * enforces across the 19 functional files.
+ * Canonical probe (frozen by SPEC §4) with a final `echo "$QUALY_BIN"`
+ * instead of the production `node "$QUALY_BIN" ...` line. Keeping the
+ * probe block byte-for-byte locks this test to the same contract the
+ * unit-paired `preamble-parity.test.ts` enforces across the 19
+ * functional files.
  */
 const PROBE_SCRIPT = [
-  'QUALY_CLI=""',
-  'for cand in "$PWD/.claude" "$HOME/.claude"; do',
-  '  [ -f "$cand/skills/lint/cli/src/index.ts" ] && QUALY_CLI="$cand/skills/lint/cli/src/index.ts" && break',
-  "done",
-  '[ -z "$QUALY_CLI" ] && { echo "qualy CLI not found in \\$PWD/.claude or \\$HOME/.claude. Run `qualy install` first." >&2; exit 5; }',
-  'echo "$QUALY_CLI"',
+  'QUALY_BIN=""',
+  "# Dev override (uso interno do repo qualy): aponta para bin/qualy.mjs local.",
+  '[ -n "$QUALY_DEV_BIN" ] && [ -f "$QUALY_DEV_BIN" ] && QUALY_BIN="$QUALY_DEV_BIN"',
+  "# Lookup padrão: cópia materializada por `qualy install`.",
+  'if [ -z "$QUALY_BIN" ]; then',
+  '  for cand in "$PWD/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs" \\',
+  '              "$HOME/.claude/skills/lint/node_modules/@hgflima/qualy/bin/qualy.mjs"; do',
+  '    [ -f "$cand" ] && QUALY_BIN="$cand" && break',
+  "  done",
+  "fi",
+  '[ -z "$QUALY_BIN" ] && { echo "qualy not installed. Run \\`npx @hgflima/qualy install\\` first." >&2; exit 5; }',
+  'echo "$QUALY_BIN"',
 ].join("\n");
 
 interface ProbeResult {
@@ -54,13 +53,25 @@ interface ProbeResult {
   readonly stderr: string;
 }
 
-function runProbe(home: string, pwd: string): ProbeResult {
+function runProbe(
+  home: string,
+  pwd: string,
+  devBin: string | null = null,
+): ProbeResult {
+  const env: NodeJS.ProcessEnv = {
+    HOME: home,
+    PWD: pwd,
+    PATH: process.env["PATH"] ?? "",
+  };
+  if (devBin !== null) {
+    env["QUALY_DEV_BIN"] = devBin;
+  }
   const result = spawnSync(
     "bash",
     ["--noprofile", "--norc", "-c", PROBE_SCRIPT],
     {
       cwd: pwd,
-      env: { HOME: home, PWD: pwd, PATH: process.env["PATH"] ?? "" },
+      env,
       encoding: "utf8",
     },
   );
@@ -71,15 +82,24 @@ function runProbe(home: string, pwd: string): ProbeResult {
   };
 }
 
-function seedCli(root: string): string {
-  const dir = join(root, ".claude", "skills", "lint", "cli", "src");
+function seedBin(root: string): string {
+  const dir = join(
+    root,
+    ".claude",
+    "skills",
+    "lint",
+    "node_modules",
+    "@hgflima",
+    "qualy",
+    "bin",
+  );
   mkdirSync(dir, { recursive: true });
-  const file = join(dir, "index.ts");
-  writeFileSync(file, "// stub for preamble-resolution e2e\n");
+  const file = join(dir, "qualy.mjs");
+  writeFileSync(file, "#!/usr/bin/env node\n// stub for preamble-resolution e2e\n");
   return file;
 }
 
-describe("e2e: preamble bash probe ($PWD → $HOME, ADR 0013 / SPEC §6)", () => {
+describe("e2e: preamble bash probe ($QUALY_DEV_BIN → $PWD → $HOME, SPEC §4)", () => {
   let tmpRoot: string;
   let tmpHome: string;
   let tmpPwd: string;
@@ -100,7 +120,7 @@ describe("e2e: preamble bash probe ($PWD → $HOME, ADR 0013 / SPEC §6)", () =>
   });
 
   it("scenario 1 — PWD-only: resolves to $PWD/.claude/...", () => {
-    const expected = seedCli(tmpPwd);
+    const expected = seedBin(tmpPwd);
     const { status, stdout, stderr } = runProbe(tmpHome, tmpPwd);
     expect(status).toBe(0);
     expect(stderr).toBe("");
@@ -108,7 +128,7 @@ describe("e2e: preamble bash probe ($PWD → $HOME, ADR 0013 / SPEC §6)", () =>
   });
 
   it("scenario 2 — HOME-only: falls back to $HOME/.claude/...", () => {
-    const expected = seedCli(tmpHome);
+    const expected = seedBin(tmpHome);
     const { status, stdout, stderr } = runProbe(tmpHome, tmpPwd);
     expect(status).toBe(0);
     expect(stderr).toBe("");
@@ -116,22 +136,43 @@ describe("e2e: preamble bash probe ($PWD → $HOME, ADR 0013 / SPEC §6)", () =>
   });
 
   it("scenario 3 — both present: $PWD wins (precedence)", () => {
-    const pwdFile = seedCli(tmpPwd);
-    seedCli(tmpHome);
+    const pwdFile = seedBin(tmpPwd);
+    seedBin(tmpHome);
     const { status, stdout, stderr } = runProbe(tmpHome, tmpPwd);
     expect(status).toBe(0);
     expect(stderr).toBe("");
     expect(stdout.trim()).toBe(pwdFile);
   });
 
-  it("scenario 4 — neither present: exit 5, stderr names both candidates", () => {
+  it("scenario 4 — neither present: exit 5, stderr names install command", () => {
     const { status, stdout, stderr } = runProbe(tmpHome, tmpPwd);
     expect(status).toBe(5);
     expect(stdout).toBe("");
-    // Stderr contract per SPEC §7: must mention "qualy CLI not found" plus
-    // both candidate roots so the user knows where the probe looked.
-    expect(stderr).toContain("qualy CLI not found");
-    expect(stderr).toContain("$PWD/.claude");
-    expect(stderr).toContain("$HOME/.claude");
+    expect(stderr).toContain("qualy not installed");
+    expect(stderr).toContain("npx @hgflima/qualy install");
+  });
+
+  it("scenario 5 — QUALY_DEV_BIN override wins over $PWD", () => {
+    seedBin(tmpPwd);
+    const devBinDir = join(tmpRoot, "dev");
+    mkdirSync(devBinDir, { recursive: true });
+    const devBin = join(devBinDir, "qualy.mjs");
+    writeFileSync(devBin, "#!/usr/bin/env node\n// dev override\n");
+    const { status, stdout, stderr } = runProbe(tmpHome, tmpPwd, devBin);
+    expect(status).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout.trim()).toBe(devBin);
+  });
+
+  it("scenario 6 — QUALY_DEV_BIN pointing to a non-existent file is ignored", () => {
+    const expected = seedBin(tmpPwd);
+    const { status, stdout, stderr } = runProbe(
+      tmpHome,
+      tmpPwd,
+      join(tmpRoot, "nonexistent", "qualy.mjs"),
+    );
+    expect(status).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout.trim()).toBe(expected);
   });
 });
