@@ -15,6 +15,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.4] — 2026-05-06
+
+### Fixed
+
+- **Após `npx @hgflima/qualy install`, qualquer slash command de `/lint:*`
+  quebrava com `ERR_MODULE_NOT_FOUND` (deps do CLI não resolvíveis) ou
+  `Cannot find module '../../package.json'` (caminho relativo errado no
+  entrypoint).** O pipeline antigo copiava `cli/src/` para
+  `.claude/skills/lint/cli/` mas não materializava `node_modules/`, então
+  `zod`, `ts-morph`, `fast-glob`, `esbuild`, `chart.js` e
+  `chartjs-chart-treemap` não eram resolvíveis fora do contexto do dev. Como
+  o install é via `npx`, `qualy` não fica no `PATH` e não há `node_modules/`
+  global para herdar — toda a v0.3.3 ficava inutilizável pós-install. Ver
+  [`.harn/docs/cli-bin-resolution/SPEC.md`](./.harn/docs/cli-bin-resolution/SPEC.md).
+
+### Changed
+
+- **Install agora materializa o pacote como `node_modules/@hgflima/qualy/`
+  dentro de `.claude/skills/lint/`** (novo módulo
+  `cli/src/install/materialize-runtime.ts`, integrado em `installHarness`).
+  Layout final:
+  ```
+  .claude/skills/lint/
+    SKILL.md
+    node_modules/
+      @hgflima/qualy/         ← bin + cli/src + package.json (canônico)
+      zod/, ts-morph/, fast-glob/, esbuild/, chart.js/, ...
+  ```
+  Bug do `../../package.json` desaparece como side-effect: agora
+  `cli/src/index.ts` só roda em `node_modules/@hgflima/qualy/cli/src/index.ts`
+  onde o caminho resolve corretamente.
+- **Slash commands e agents passam a invocar o bin via `$QUALY_BIN`** em vez
+  de fallback para `npx`/PATH. Preâmbulo bash em `skills/lint/SKILL.md`,
+  4 `agents/lint-*.md` e 14 `commands/lint/**/*.md` migrados; parity garantida
+  byte-a-byte por `cli/tests/unit/preamble-parity.test.ts`. O preâmbulo
+  resolve `node_modules/@hgflima/qualy/bin/qualy.mjs` no scope correto e
+  falha com `exit 5` (`MISSING_DEP`) + mensagem clara em stderr quando o
+  runtime não está materializado.
+- **`cli/` deixa de ser copiado** para `.claude/skills/lint/cli/`; agora vive
+  apenas dentro de `node_modules/@hgflima/qualy/cli/`. Reduz duplicação e
+  elimina o orphan `package.json` que causava o Bug 2.
+
+### Added
+
+- **Novo manifest kind `runtime-node-modules`** registra o `node_modules/`
+  materializado para uninstall/rollback determinísticos. `qualy uninstall`
+  remove o `node_modules/` materializado junto com os demais artefatos
+  (manifest é fonte de verdade); `qualy update` re-materializa a nova versão
+  no mesmo caminho. Cobertura: `cli/tests/unit/install/materialize-runtime.test.ts`,
+  ampliações em `install.test.ts`, `uninstall.test.ts`, `update.test.ts`,
+  `manifest.test.ts`, `copy.test.ts`.
+- **E2E smokes** `cli/tests/e2e/cli-invocation-bug1.test.ts` e
+  `cli-invocation-bug2.test.ts` validam Bug 1 e Bug 2 via tarball real
+  (`npm pack` → `npx --offline`), garantindo que regressões não passem
+  despercebidas.
+
+---
+
 ## [0.3.3] — 2026-05-06
 
 ### Fixed
