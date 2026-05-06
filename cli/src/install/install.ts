@@ -52,16 +52,21 @@ import {
 } from "./version.ts";
 
 /**
- * Validates that a `packageSpec` is exactly `@hgflima/qualy@<semver-ish>` —
- * no shell metacharacters, no whitespace. Defense in depth: the spec we
- * construct internally already follows this shape, but `materializeRuntime`
- * eventually hands it to `npm install` and we want a hard guard at the
- * boundary (TASKS Task 3 critério #6).
+ * Validates that a `packageSpec` is one of:
+ *   - `@hgflima/qualy@<semver-ish>` (canonical registry spec)
+ *   - `file:<path-to-tgz>` (local tarball, used by CI/test pre-publish via
+ *     `QUALY_PACKAGE_SPEC` to avoid the chicken-and-egg of `npm install`-ing
+ *     a version that hasn't been published yet)
+ *
+ * No shell metacharacters, no whitespace in either case. Defense in depth:
+ * the spec is eventually handed to `npm install` and we want a hard guard
+ * at the boundary (TASKS Task 3 critério #6).
  */
-const PACKAGE_SPEC_RE = /^@hgflima\/qualy@[A-Za-z0-9.+-]+$/;
+const REGISTRY_SPEC_RE = /^@hgflima\/qualy@[A-Za-z0-9.+-]+$/;
+const FILE_SPEC_RE = /^file:[A-Za-z0-9._/+-]+\.tgz$/;
 
 function isValidPackageSpec(spec: string): boolean {
-  if (!PACKAGE_SPEC_RE.test(spec)) return false;
+  if (!REGISTRY_SPEC_RE.test(spec) && !FILE_SPEC_RE.test(spec)) return false;
   return !/[;&|\s]/.test(spec);
 }
 
@@ -196,7 +201,12 @@ export async function installHarness(
     };
   }
 
-  const packageSpec = `@hgflima/qualy@${version}`;
+  // QUALY_PACKAGE_SPEC override: lets pre-publish CI / e2e bypass the
+  // registry by passing a packed local tarball (e.g. `file:/abs/qualy.tgz`).
+  // Production users never set this; the canonical
+  // `@hgflima/qualy@<version>` is used by default.
+  const packageSpec =
+    process.env.QUALY_PACKAGE_SPEC ?? `@hgflima/qualy@${version}`;
   if (!isValidPackageSpec(packageSpec)) {
     return {
       ok: false,

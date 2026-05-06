@@ -42,6 +42,15 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Pack local tarball for tests
+        # Pre-publish CI cannot resolve `@hgflima/qualy@<this-version>` from
+        # the registry (chicken-and-egg: this very workflow is what publishes
+        # it). Pack the workspace and expose it via QUALY_PACKAGE_SPEC so the
+        # install pipeline materializes from the local tarball during tests.
+        run: |
+          TARBALL=$(npm pack --silent | tail -1)
+          echo "QUALY_PACKAGE_SPEC=file:$(pwd)/${TARBALL}" >> "$GITHUB_ENV"
+
       - name: Unit tests
         run: npm test
 

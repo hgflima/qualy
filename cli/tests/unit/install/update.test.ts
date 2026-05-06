@@ -426,6 +426,13 @@ describe("updateHarness", () => {
       "v2\n",
     );
 
+    // This test asserts the canonical `@hgflima/qualy@<version>` spec is
+    // constructed from `package.json`. Clear any QUALY_PACKAGE_SPEC override
+    // (set by CI to `file:*.tgz` so install can reach a pre-publish tarball)
+    // so we exercise the default spec path here.
+    const priorSpecOverride = process.env.QUALY_PACKAGE_SPEC;
+    delete process.env.QUALY_PACKAGE_SPEC;
+
     try {
       const materializeCalls: Array<{
         target: string;
@@ -482,6 +489,11 @@ describe("updateHarness", () => {
       expect(materializeCalls[0]?.packageSpec).toBe("@hgflima/qualy@0.2.0");
       expect(materializeCalls[0]?.dryRun).toBe(false);
     } finally {
+      if (priorSpecOverride === undefined) {
+        delete process.env.QUALY_PACKAGE_SPEC;
+      } else {
+        process.env.QUALY_PACKAGE_SPEC = priorSpecOverride;
+      }
       rmSync(newPayload, { recursive: true, force: true });
     }
   });

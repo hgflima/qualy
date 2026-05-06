@@ -193,13 +193,7 @@ describe("CLI handlers — happy paths via real install round-trip", () => {
     setStreams({ stdout: process.stdout, stderr: process.stderr });
   });
 
-  // TODO: re-enable once `runHarnessInstall` exposes a `materialize` test
-  // seam. Today this round-trip resolves the version from `package.json` and
-  // shells out to `npm install @hgflima/qualy@<version>` — which fails in
-  // pre-publish CI because the version about to be published doesn't exist
-  // in the registry yet (chicken-and-egg). Same precedent as the
-  // `runHarnessUninstall` round-trip skipped at T7 (commit 21a4cf2).
-  it.skip("runHarnessInstall(--scope local) returns OK and writes the manifest", async () => {
+  it("runHarnessInstall(--scope local) returns OK and writes the manifest", async () => {
     const code = await runHarnessInstall(
       ["--scope", "local", "--cwd", workspace],
       { stderr },
