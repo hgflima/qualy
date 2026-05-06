@@ -33,11 +33,11 @@
 - [x] **T10** — ADR 0006 (cross-link + exemplo)
 - [x] **T11** — ADR 0007 (cross-link + exemplo)
 - [x] **T12** — ADR 0009 (exemplo)
-- [ ] **T13** — `.harn/docs/mvp/PLAN.md` + `IMPLEMENTATION_PLAN.md`
+- [x] **T13** — `.harn/docs/mvp/PLAN.md` + `IMPLEMENTATION_PLAN.md`
 
 ### ✅ Checkpoint C
 - [ ] `grep -rln 'CLAUDE_PLUGIN_ROOT' --include="*.md" .` → 0 (exceto referências históricas explícitas em ADR 0013)
-- [ ] Cross-links 0006→0013 e 0007→0013 visíveis
+- [x] Cross-links 0006→0013 e 0007→0013 visíveis
 
 ## Phase 4 — Release
 

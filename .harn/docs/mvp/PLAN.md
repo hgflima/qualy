@@ -192,9 +192,12 @@ qualy/
 Pattern para todos os commands/agents (definido uma vez em `SKILL.md` e reusado):
 
 ```bash
-# preâmbulo padrão de todo command/agent
-QUALY_CLI="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude}/skills/lint/cli/src/index.ts"
-# ou, se rodando do workspace de dev: $REPO/cli/src/index.ts (detectado por presença de SPEC.md)
+# preâmbulo padrão de todo command/agent (atualizado pelo SPEC scope-resolution; ver ADR 0013)
+QUALY_CLI=""
+for cand in "$PWD/.claude" "$HOME/.claude"; do
+  [ -f "$cand/skills/lint/cli/src/index.ts" ] && QUALY_CLI="$cand/skills/lint/cli/src/index.ts" && break
+done
+[ -z "$QUALY_CLI" ] && { echo "qualy CLI not found in \$PWD/.claude or \$HOME/.claude. Run \`qualy install\` first." >&2; exit 5; }
 node --experimental-strip-types "$QUALY_CLI" <subcommand> --cwd "$PWD" "$@"
 ```
 
