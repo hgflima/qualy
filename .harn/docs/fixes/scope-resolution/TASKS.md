@@ -30,7 +30,7 @@
 ## Phase 3 — Documentação histórica (6 arquivos)
 
 - [x] **T9** — `README.md`
-- [ ] **T10** — ADR 0006 (cross-link + exemplo)
+- [x] **T10** — ADR 0006 (cross-link + exemplo)
 - [ ] **T11** — ADR 0007 (cross-link + exemplo)
 - [ ] **T12** — ADR 0009 (exemplo)
 - [ ] **T13** — `.harn/docs/mvp/PLAN.md` + `IMPLEMENTATION_PLAN.md`

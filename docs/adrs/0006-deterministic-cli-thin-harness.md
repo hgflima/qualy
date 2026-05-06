@@ -2,7 +2,7 @@
 
 - Status: aceito
 - Data: 2026-05-03
-- Relacionados: ADR 0007 (runtime TS via `--experimental-strip-types`), ADR 0008 (rationale híbrida das recommendations), ADR 0009 (distribuição via `install.sh`)
+- Relacionados: ADR 0007 (runtime TS via `--experimental-strip-types`), ADR 0008 (rationale híbrida das recommendations), ADR 0009 (distribuição via `install.sh`), ADR 0013 (probe `$PWD → $HOME` para resolver `QUALY_CLI`)
 
 ## Contexto
 
@@ -29,7 +29,7 @@ Adotar arquitetura em duas camadas:
    - Toda escrita no projeto-alvo passa por `safe-write` registrando arquivos tocados em `.lint-manifest.json` (necessário para `uninstall` completo).
 
 2. **Camada harness — `skills/lint/SKILL.md`, `commands/lint/<x>.md`, `agents/lint-{detector,installer,auditor,migrator}.md`** (Markdown interpretado pelo modelo):
-   - `SKILL.md` é o router conversacional (≤ 200 linhas) e define o pattern de resolução do CLI (`QUALY_CLI="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude}/skills/lint/cli/src/index.ts"`).
+   - `SKILL.md` é o router conversacional (≤ 200 linhas) e define o pattern de resolução do CLI via probe `$PWD/.claude → $HOME/.claude` (ver ADR 0013 para o bloco canônico). Anteriormente o preâmbulo usava `${CLAUDE_PLUGIN_ROOT:-$HOME/.claude}`, abandonado porque o qualy nunca foi distribuído como plugin oficial — ver ADR 0013, seção Contexto.
    - `commands/lint/*.md` são orquestradores: chamam subcomandos do CLI em ordem e usam `AskUserQuestion` para confirmações ou inputs.
    - `agents/*.md` são wrappers finos que invocam o CLI e devolvem sumário estruturado (≤ 30 linhas).
    - Harness **nunca** parseia `package.json`, executa `git`/`grep`/`cloc`, ou edita configs diretamente — apenas chama o CLI e interpreta o JSON.
