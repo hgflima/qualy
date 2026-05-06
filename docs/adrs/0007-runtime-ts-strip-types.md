@@ -2,7 +2,7 @@
 
 - Status: superseded by ADR 0011 (2026-05-05)
 - Data: 2026-05-03
-- Relacionados: ADR 0006 (CLI determinístico com harness fino), ADR 0009 (distribuição via `install.sh`), ADR 0011 (substitui o runtime por tsx)
+- Relacionados: ADR 0006 (CLI determinístico com harness fino), ADR 0009 (distribuição via `install.sh`), ADR 0011 (substitui o runtime por tsx), ADR 0013 (probe `$PWD → $HOME` para resolver `QUALY_CLI`)
 
 ## Contexto
 
@@ -10,12 +10,16 @@ ADR 0006 fixou que toda a lógica imperativa do `/lint` vive em `cli/src/` (Type
 
 Restrições herdadas do SPEC e do PLAN:
 
-- O CLI é chamado de dentro de Bash blocks dos `.md` do harness, com o pattern fixado em `PLAN §Resolução do CLI`:
+- O CLI é chamado de dentro de Bash blocks dos `.md` do harness, com o pattern canônico definido em ADR 0013 (probe `$PWD/.claude → $HOME/.claude`):
   ```bash
-  QUALY_CLI="${CLAUDE_PLUGIN_ROOT:-$HOME/.claude}/skills/lint/cli/src/index.ts"
+  QUALY_CLI=""
+  for cand in "$PWD/.claude" "$HOME/.claude"; do
+    [ -f "$cand/skills/lint/cli/src/index.ts" ] && QUALY_CLI="$cand/skills/lint/cli/src/index.ts" && break
+  done
+  [ -z "$QUALY_CLI" ] && { echo "qualy CLI not found in \$PWD/.claude or \$HOME/.claude. Run \`qualy install\` first." >&2; exit 5; }
   node --experimental-strip-types "$QUALY_CLI" <subcommand> --cwd "$PWD" "$@"
   ```
-  Ou seja, o ponto de entrada referenciado é um **arquivo `.ts` em `src/`**, não um bundle.
+  Ou seja, o ponto de entrada referenciado é um **arquivo `.ts` em `src/`**, não um bundle. Anteriormente o preâmbulo era uma única linha com `${CLAUDE_PLUGIN_ROOT:-$HOME/.claude}`; abandonado porque o qualy nunca foi distribuído como plugin oficial — ver ADR 0013, seção Contexto.
 - A distribuição é feita por `install.sh` (ADR 0009) que copia/symlinka `cli/` para `~/.claude/skills/lint/cli/`. Edits no fonte precisam ter efeito imediato no modo `--dev` (symlink) — incompatível com qualquer pipeline de build entre fonte e execução.
 - A janela de iteração precisa ser curta: `npm test`/`npm run typecheck` rodam em segundos, e qualquer build step adicional vira atrito desproporcional para um CLI deste porte.
 - O peer ecosystem (`oxc`, `oxlint`, `oxfmt`, `ts-morph`, `quality-metrics`) já exige versões recentes de Node, então um floor moderno é viável sem perder usuários alvo.
